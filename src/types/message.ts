@@ -1,14 +1,43 @@
 import type { Database, Message } from '@/types/database';
 
-export type MessagePageRow =
+export type MessagePageDatabaseRow =
   Database['public']['Functions']['list_conversation_messages']['Returns'][number];
+
+export type MessagePageRow = MessagePageDatabaseRow & {
+  signed_media_url?: string | null;
+};
 
 export type MessageDeliveryStatus = 'sent' | 'delivered' | 'read';
 export type MessageLocalState = 'sending' | MessageDeliveryStatus | 'failed';
+export type MediaSendStage = 'preparing' | 'uploading' | 'committing' | 'ready' | 'failed';
+
+export type ChatAttachment = {
+  id: string;
+  storageBucket: string;
+  storagePath: string;
+  mimeType: string;
+  fileName: string | null;
+  fileSize: number | null;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+  signedUrl: string | null;
+};
+
+export type PendingImageAsset = {
+  uri: string;
+  width: number;
+  height: number;
+  fileName: string | null;
+};
 
 export type ChatMessage = Message & {
   isOptimistic?: boolean;
   localState?: MessageLocalState;
+  attachment?: ChatAttachment | null;
+  localMediaUri?: string | null;
+  mediaSendStage?: MediaSendStage;
+  pendingImageAsset?: PendingImageAsset;
 };
 
 export type MessageCursor = {

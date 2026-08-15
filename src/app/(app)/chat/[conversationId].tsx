@@ -12,13 +12,24 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton, AppIcon, AppText, Avatar, EmptyState, MessageBubble } from '@/components/ui';
+import {
+  AppButton,
+  AppIcon,
+  AppText,
+  AttachmentPickerModal,
+  Avatar,
+  EmptyState,
+  MediaMessageBubble,
+  MediaViewer,
+  MessageBubble,
+} from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useConversationMessages } from '@/hooks/use-conversation-messages';
 import { usePeerPresence } from '@/hooks/use-peer-presence';
 import { useTypingIndicator } from '@/hooks/use-typing-indicator';
-import { MAX_TEXT_MESSAGE_LENGTH } from '@/services/message-service';
 import { getConversationSummary } from '@/services/conversation-service';
+import { chooseChatImageFromLibrary, takeChatPhoto } from '@/services/media-service';
+import { MAX_TEXT_MESSAGE_LENGTH } from '@/services/message-service';
 import { getAvatarPublicUrl } from '@/services/profile-service';
 import { useAppTheme } from '@/theme';
 import type { ConversationSummary } from '@/types/conversation';
@@ -61,6 +72,10 @@ function formatLastSeen(iso: string | null) {
   return `last seen ${day} at ${time}`;
 }
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'Unable to select this photo.';
+}
+
 export default function ConversationScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
@@ -78,6 +93,9 @@ export default function ConversationScreen() {
   const [isLoadingSummary, setIsLoadingSummary] = useState(true);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const [attachmentMenuVisible, setAttachmentMenuVisible] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<{ uri: string; caption: string | null } | null>(null);
 
   const {
     messages,
@@ -89,6 +107,7 @@ export default function ConversationScreen() {
     reload,
     loadOlder,
     queueTextMessage,
+    queueImageMessage,
     retryMessage,
   } = useConversationMessages(conversationId, user?.id);
 
@@ -132,6 +151,7 @@ export default function ConversationScreen() {
   const name = summary?.display_name ?? fallbackName ?? 'Conversation';
   const avatarUri = getAvatarPublicUrl(summary?.avatar_path);
   const canSend = Boolean(summary && user?.id && draft.trim().length > 0);
+  const canAttach = Boolean(summary && user?.id);
 
   const headerSubtitle = useMemo(() => {
     if (realtimeState !== 'connected') return 'Reconnecting…';
@@ -157,10 +177,76 @@ export default function ConversationScreen() {
     if (accepted) setDraft('');
   };
 
+  const choosePhoto = async () => {
+    setAttachmentMenuVisible(false);
+    setMediaError(null);
+    stopTyping();
+
+    try {
+      const asset = await chooseChatImageFromLibrary();
+      if (asset) queueImageMessage(asset);
+    } catch (error) {
+      setMediaError(getErrorMessage(error));
+    }
+  };
+
+  const takePhoto = async () => {
+    setAttachmentMenuVisible(false);
+    setMediaError(null);
+    stopTyping();
+
+    try {
+      const asset = await takeChatPhoto();
+      if (asset) queueImageMessage(asset);
+    } catch (error) {
+      setMediaError(getErrorMessage(error));
+    }
+  };
+
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const outgoing = item.sender_id === user?.id;
-    const body = item.deleted_at ? 'Message deleted' : (item.body ?? '');
 
+    if (item.deleted_at) {
+      return (
+        <View style={styles.messageRow}>
+          <MessageBubble
+            text="Message deleted"
+            time={formatMessageTime(item.created_at)}
+            outgoing={outgoing}
+            status={outgoing ? (item.localState ?? 'sent') : undefined}
+          />
+        </View>
+      );
+    }
+
+    if (item.message_type === 'image') {
+      const mediaUri = item.attachment?.signedUrl ?? item.localMediaUri ?? null;
+      const width = item.attachment?.width ?? item.pendingImageAsset?.width ?? null;
+      const height = item.attachment?.height ?? item.pendingImageAsset?.height ?? null;
+
+      return (
+        <View style={styles.messageRow}>
+          <MediaMessageBubble
+            uri={mediaUri}
+            width={width}
+            height={height}
+            caption={item.body}
+            time={formatMessageTime(item.created_at)}
+            outgoing={outgoing}
+            status={outgoing ? (item.localState ?? 'sent') : undefined}
+            mediaStage={item.mediaSendStage}
+            onOpen={mediaUri
+              ? () => setViewer({ uri: mediaUri, caption: item.body })
+              : undefined}
+            onRetry={item.localState === 'failed'
+              ? () => retryMessage(item.client_message_id)
+              : undefined}
+          />
+        </View>
+      );
+    }
+
+    const body = item.body ?? (item.message_type === 'file' ? 'File' : 'Message');
     return (
       <View style={styles.messageRow}>
         <MessageBubble
@@ -207,7 +293,7 @@ export default function ConversationScreen() {
           <EmptyState
             icon={{ ios: 'message', android: 'chat_bubble_outline', web: 'chat_bubble_outline' }}
             title={`Message ${summary?.display_name ?? name}`}
-            description="Send the first message. It will be stored in PostgreSQL and delivered live through a private Realtime channel."
+            description="Send text or a photo. Messages stay durable in PostgreSQL while media is protected in private Supabase Storage."
           />
         </View>
       );
@@ -301,21 +387,32 @@ export default function ConversationScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.messages}>{renderMessages()}</View>
 
-          {loadError && messages.length > 0 ? (
+          {(loadError && messages.length > 0) || mediaError ? (
             <View style={[styles.inlineError, { backgroundColor: theme.colors.surfaceMuted }]}>
-              <AppText variant="micro" tone="danger">{loadError}</AppText>
+              <AppText variant="micro" tone="danger">{mediaError ?? loadError}</AppText>
             </View>
           ) : null}
 
           <View style={[styles.composer, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border }]}>
             <Pressable
-              disabled
-              accessibilityLabel="Attachments arrive in Phase 12"
-              style={[styles.iconButton, { backgroundColor: theme.colors.surfaceMuted, opacity: 0.55 }]}>
+              accessibilityRole="button"
+              disabled={!canAttach}
+              accessibilityLabel="Attach photo"
+              onPress={() => {
+                setMediaError(null);
+                setAttachmentMenuVisible(true);
+              }}
+              style={({ pressed }) => [
+                styles.iconButton,
+                {
+                  backgroundColor: theme.colors.surfaceMuted,
+                  opacity: !canAttach ? 0.5 : (pressed ? 0.72 : 1),
+                },
+              ]}>
               <AppIcon
                 name={{ ios: 'paperclip', android: 'attach_file', web: 'attach_file' }}
                 size={22}
-                color={theme.colors.textTertiary}
+                color={canAttach ? theme.colors.primary : theme.colors.textTertiary}
               />
             </Pressable>
 
@@ -356,6 +453,20 @@ export default function ConversationScreen() {
           </View>
         </KeyboardAvoidingView>
       )}
+
+      <AttachmentPickerModal
+        visible={attachmentMenuVisible}
+        onClose={() => setAttachmentMenuVisible(false)}
+        onChoosePhoto={() => void choosePhoto()}
+        onTakePhoto={() => void takePhoto()}
+      />
+
+      <MediaViewer
+        visible={Boolean(viewer)}
+        uri={viewer?.uri}
+        caption={viewer?.caption}
+        onClose={() => setViewer(null)}
+      />
     </SafeAreaView>
   );
 }

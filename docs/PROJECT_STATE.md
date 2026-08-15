@@ -1,7 +1,7 @@
 # PulseChat Project State
 
 ## Current phase
-Phase 11 — Typing & Presence
+Phase 12 — Image media messaging
 
 ## Completed
 - Phase 1 development environment + Android development build
@@ -14,49 +14,54 @@ Phase 11 — Typing & Presence
 - Phase 8 transactional direct-chat creation + real Chats list
 - Phase 9 durable realtime one-to-one text messaging
 - Phase 10 delivered/read receipts + unread counters
-- Phase 11 typing indicators + online/offline presence + last seen packaged
+- Phase 11 typing indicators + online/offline presence + last seen
+- Phase 12 private image media messaging packaged + image RPC/Presence lifecycle hotfix
 
-## Phase 11 implementation
-- `user_presence` durable last-seen table
-- self-only `touch_my_last_seen` heartbeat RPC
-- conversation-authorized `get_user_last_seen` RPC
-- app-level `presence:<user_uuid>` private Realtime Presence channel
-- owner-only Presence publishing authorization
-- conversation-peer Presence observation authorization
-- Presence untracks when React Native app backgrounds
-- Presence retracks/reconnects when app returns active
-- 60-second durable last-seen heartbeat while active
-- `typing:<conversation_uuid>` private Broadcast channel
-- only conversation members may send/receive typing events
-- typing true refresh is throttled rather than sent on every keystroke
-- typing false after local idle delay
-- receiver-side 4-second expiry prevents stuck typing indicators
-- direct chat header shows typing -> online -> last seen priority
-- avatar online badge reflects peer Presence
+## Phase 12 implementation
+- private `chat-media` Supabase Storage bucket
+- 10 MB Storage object limit; Phase 12 client writes JPEG only
+- canonical `conversation_uuid/uploader_uuid/client_message_uuid.jpg` object path
+- Storage RLS based on actual conversation membership
+- uploader-only writes/deletes within the uploader folder
+- direct client message INSERT policy tightened to text only
+- idempotent `create_image_message` RPC creates image message + attachment metadata atomically on the DB side
+- hotfix uses the named `messages_sender_client_unique` constraint to avoid PL/pgSQL `sender_id` ambiguity
+- image attachment projection added to `list_conversation_messages`
+- private signed URLs generated only after message/RLS access
+- images resized to max 1600px and compressed to JPEG before upload
+- gallery picker + Android/iOS camera capture
+- optimistic local photo bubble
+- preparing/uploading/committing/failure states
+- retry reuses the same client message ID and canonical Storage path
+- `media_message_ready` private Broadcast reconciles attachment metadata after message INSERT
+- image bubbles retain delivered/read ticks
+- full-screen image viewer
 
 ## Developer verification required
-1. Apply migrations through Phase 10 first.
-2. Run `supabase/migrations/202608150008_phase11_typing_presence.sql`.
-3. Run `supabase/phase11_verify.sql`.
-4. Start Expo with `npx expo start -c`.
-5. Run `npm run typecheck`.
-6. Test two accounts with both apps foregrounded: both should show online.
-7. Type in A without sending: B should show `typing…`, then clear after idle.
-8. Background A: B should change from online to last seen.
-9. Foreground A: B should return to online.
-10. Kill A unexpectedly and confirm Presence eventually leaves; last seen remains approximately the most recent heartbeat.
+1. Ensure migrations through Phase 11 are applied.
+2. Run `202608150009_phase12_image_media.sql` for a fresh install, or `202608150010_phase12_hotfix.sql` if Phase 12 was already applied.
+3. Run `supabase/phase12_verify.sql`.
+4. Run `npx expo prebuild --clean` because camera permission config changed.
+5. Run `npx expo run:android` once with an emulator/device connected.
+6. Run `npx expo start -c` for normal development.
+7. Run `npm run typecheck`.
+8. A sends gallery photo; B sees it without refresh.
+9. B opens it full-screen; A receives delivered/read ticks as before.
+10. Restart both clients; the private image must reload from Storage history.
+11. Disconnect network, send image, reconnect and tap retry; no duplicate message/object should appear.
+12. Verify Account C cannot create a signed URL/download an A-B media object through normal authenticated Storage access.
 
 ## Intentionally not implemented yet
-- image/file/media messages (Phase 12)
 - reply/edit/delete/reactions (Phase 13)
-- groups (Phase 14)
+- group chats (Phase 14)
 - push notifications (Phase 15)
+- generic document/video/audio/voice-note composer UI (media schema is already ready)
 
 ## Known limitations
-- Online is app-session presence, not device push reachability.
-- Last seen is intentionally approximate after an abrupt OS/process kill; active sessions persist a heartbeat every 60 seconds and background transitions update immediately.
-- Presence/typing UI is optimized for direct chats. Group-specific typing participant semantics arrive in Phase 14.
-- Presence is intentionally not subscribed for every Chats-list row to avoid unnecessary Presence fan-out.
+- Failed image sends are retryable while the current app session still has the local image URI. Persisting an offline media queue across process restarts belongs to Phase 19.
+- Signed media URLs are temporary and regenerated when history is fetched/reconciled.
+- If Storage succeeds but a non-retryable database error occurs, an orphan Storage object can remain; production cleanup/hardening belongs to Phase 21.
+- Phase 12 proves the image pipeline first. Video/audio/document UI will reuse the same private bucket + attachment model later.
 
 ## Database migrations
 - `202608150001_phase4_auth_profiles.sql`
@@ -67,6 +72,8 @@ Phase 11 — Typing & Presence
 - `202608150006_phase9_realtime_text_messaging.sql`
 - `202608150007_phase10_delivery_read_unread.sql`
 - `202608150008_phase11_typing_presence.sql`
+- `202608150009_phase12_image_media.sql`
+- `202608150010_phase12_hotfix.sql`
 
 ## Environment variables
 Local `.env`:
@@ -75,7 +82,7 @@ Local `.env`:
 
 ## Git checkpoint
 After verification:
-`feat: add typing indicators and user presence`
+`feat: add secure image media messaging`
 
 ## Next task
-Phase 12 — image/file/media messages.
+Phase 13 — reply/edit/delete/reactions.

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { sendImageMessage } from '@/services/media-service';
 import {
   createClientMessageId,
   listConversationMessages,
@@ -11,10 +12,13 @@ import {
 import { markConversationRead } from '@/services/receipt-service';
 import type { Message } from '@/types/database';
 import type {
+  ChatAttachment,
   ChatMessage,
+  MediaSendStage,
   MessageCursor,
   MessageDeliveryStatus,
   MessagePageRow,
+  PendingImageAsset,
   ReceiptCursorEvent,
 } from '@/types/message';
 
@@ -28,7 +32,20 @@ function compareNewestFirst(a: ChatMessage, b: ChatMessage) {
 }
 
 function toMessageRecord(message: ServerMessage): Message {
-  const { delivery_status: _deliveryStatus, ...record } = message as MessagePageRow;
+  const {
+    delivery_status: _deliveryStatus,
+    attachment_id: _attachmentId,
+    attachment_storage_bucket: _attachmentStorageBucket,
+    attachment_storage_path: _attachmentStoragePath,
+    attachment_mime_type: _attachmentMimeType,
+    attachment_file_name: _attachmentFileName,
+    attachment_file_size: _attachmentFileSize,
+    attachment_width: _attachmentWidth,
+    attachment_height: _attachmentHeight,
+    attachment_duration_ms: _attachmentDurationMs,
+    signed_media_url: _signedMediaUrl,
+    ...record
+  } = message as MessagePageRow;
   return record as Message;
 }
 
@@ -37,11 +54,33 @@ function getDeliveryStatus(message: ServerMessage): MessageDeliveryStatus | null
   return status === 'sent' || status === 'delivered' || status === 'read' ? status : null;
 }
 
+function getAttachment(message: ServerMessage): ChatAttachment | null {
+  const row = message as MessagePageRow;
+  if (!row.attachment_id || !row.attachment_storage_path || !row.attachment_mime_type) return null;
+
+  return {
+    id: row.attachment_id,
+    storageBucket: row.attachment_storage_bucket ?? 'chat-media',
+    storagePath: row.attachment_storage_path,
+    mimeType: row.attachment_mime_type,
+    fileName: row.attachment_file_name ?? null,
+    fileSize: row.attachment_file_size ?? null,
+    width: row.attachment_width ?? null,
+    height: row.attachment_height ?? null,
+    durationMs: row.attachment_duration_ms ?? null,
+    signedUrl: row.signed_media_url ?? null,
+  };
+}
+
 function normalizeServerMessage(message: ServerMessage, currentUserId: string): ChatMessage {
   const record = toMessageRecord(message);
+  const attachment = getAttachment(message);
+
   return {
     ...record,
     isOptimistic: false,
+    attachment,
+    mediaSendStage: record.message_type === 'image' && attachment ? 'ready' : undefined,
     localState: record.sender_id === currentUserId
       ? (getDeliveryStatus(message) ?? 'sent')
       : undefined,
@@ -54,7 +93,28 @@ function mergeServerMessage(
   currentUserId: string,
 ): ChatMessage[] {
   const record = toMessageRecord(incoming);
-  const normalized = normalizeServerMessage(incoming, currentUserId);
+  const existing = current.find((message) => (
+    message.id === record.id
+    || (
+      message.sender_id === record.sender_id
+      && message.client_message_id === record.client_message_id
+    )
+  ));
+  let normalized = normalizeServerMessage(incoming, currentUserId);
+
+  // The generic message INSERT Broadcast can arrive just before Phase 12's
+  // attachment metadata is committed. Keep the local preview/pending asset until
+  // media_message_ready causes the authoritative history reconciliation.
+  if (record.message_type === 'image' && !normalized.attachment && existing) {
+    normalized = {
+      ...normalized,
+      attachment: existing.attachment,
+      localMediaUri: existing.localMediaUri,
+      pendingImageAsset: existing.pendingImageAsset,
+      mediaSendStage: existing.mediaSendStage,
+    };
+  }
+
   const withoutDuplicate = current.filter((message) => {
     if (message.id === record.id) return false;
 
@@ -131,7 +191,6 @@ export function useConversationMessages(
     try {
       await markConversationRead(conversationId);
     } catch (error) {
-      // A receipt failure must never block reading/sending the conversation.
       console.warn('Unable to mark conversation read:', error);
     }
   }, [conversationId, currentUserId]);
@@ -196,16 +255,15 @@ export function useConversationMessages(
         }
       },
       onReceiptState: (event) => {
-        // Cursor application makes the tick update instant for current direct
-        // chats. A reconciliation fetch then remains the authoritative fallback.
         setMessages((current) => applyReceiptCursor(current, event, currentUserId));
+        void refreshLatest();
+      },
+      onMediaReady: () => {
         void refreshLatest();
       },
       onStateChange: (state) => {
         setRealtimeState(state);
         if (state === 'connected') {
-          // PostgreSQL is authoritative. Reconcile after each successful join so
-          // reconnects cannot leave message or receipt gaps.
           void refreshLatest();
         }
       },
@@ -299,6 +357,72 @@ export function useConversationMessages(
     return true;
   }, [conversationId, currentUserId]);
 
+  const sendPendingImage = useCallback((
+    clientMessageId: string,
+    asset: PendingImageAsset,
+  ) => {
+    if (!conversationId || !currentUserId) return;
+
+    void sendImageMessage({
+      conversationId,
+      userId: currentUserId,
+      clientMessageId,
+      asset,
+      onStage: (stage: Exclude<MediaSendStage, 'ready' | 'failed'>) => {
+        if (!mountedRef.current) return;
+        setMessages((current) => current.map((message) => (
+          message.client_message_id === clientMessageId
+            ? { ...message, mediaSendStage: stage, localState: 'sending' as const }
+            : message
+        )));
+      },
+    })
+      .then((savedMessage) => {
+        if (!mountedRef.current) return;
+        setMessages((current) => mergeServerMessage(current, savedMessage, currentUserId));
+      })
+      .catch((error) => {
+        console.warn('Unable to send image:', error);
+        if (!mountedRef.current) return;
+        setMessages((current) => current.map((message) => (
+          message.client_message_id === clientMessageId
+            ? {
+              ...message,
+              localState: 'failed' as const,
+              mediaSendStage: 'failed' as const,
+            }
+            : message
+        )));
+      });
+  }, [conversationId, currentUserId]);
+
+  const queueImageMessage = useCallback((asset: PendingImageAsset) => {
+    if (!conversationId || !currentUserId) return false;
+
+    const clientMessageId = createClientMessageId();
+    const optimistic: ChatMessage = {
+      id: clientMessageId,
+      conversation_id: conversationId,
+      sender_id: currentUserId,
+      client_message_id: clientMessageId,
+      message_type: 'image',
+      body: null,
+      reply_to_message_id: null,
+      created_at: new Date().toISOString(),
+      edited_at: null,
+      deleted_at: null,
+      isOptimistic: true,
+      localState: 'sending',
+      localMediaUri: asset.uri,
+      pendingImageAsset: asset,
+      mediaSendStage: 'preparing',
+    };
+
+    setMessages((current) => [optimistic, ...current].sort(compareNewestFirst));
+    sendPendingImage(clientMessageId, asset);
+    return true;
+  }, [conversationId, currentUserId, sendPendingImage]);
+
   const retryMessage = useCallback((clientMessageId: string) => {
     if (!conversationId || !currentUserId) return;
 
@@ -306,7 +430,19 @@ export function useConversationMessages(
       (message) => message.client_message_id === clientMessageId && message.localState === 'failed',
     );
 
-    if (!target?.body) return;
+    if (!target) return;
+
+    if (target.message_type === 'image' && target.pendingImageAsset) {
+      setMessages((current) => current.map((message) => (
+        message.client_message_id === clientMessageId
+          ? { ...message, localState: 'sending' as const, mediaSendStage: 'preparing' as const }
+          : message
+      )));
+      sendPendingImage(clientMessageId, target.pendingImageAsset);
+      return;
+    }
+
+    if (!target.body) return;
 
     setMessages((current) => current.map((message) => (
       message.client_message_id === clientMessageId
@@ -333,7 +469,7 @@ export function useConversationMessages(
             : message
         )));
       });
-  }, [conversationId, currentUserId, messages]);
+  }, [conversationId, currentUserId, messages, sendPendingImage]);
 
   return useMemo(() => ({
     messages,
@@ -345,6 +481,7 @@ export function useConversationMessages(
     reload: loadInitial,
     loadOlder,
     queueTextMessage,
+    queueImageMessage,
     retryMessage,
   }), [
     hasMore,
@@ -354,6 +491,7 @@ export function useConversationMessages(
     loadInitial,
     loadOlder,
     messages,
+    queueImageMessage,
     queueTextMessage,
     realtimeState,
     retryMessage,

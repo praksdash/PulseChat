@@ -1,0 +1,175 @@
+import { Image } from 'expo-image';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+
+import { AppIcon } from './app-icon';
+import { AppText } from './app-text';
+import { useAppTheme } from '@/theme';
+import type { MediaSendStage, MessageLocalState } from '@/types/message';
+
+type MediaMessageBubbleProps = {
+  uri?: string | null;
+  width?: number | null;
+  height?: number | null;
+  caption?: string | null;
+  time: string;
+  outgoing?: boolean;
+  status?: MessageLocalState;
+  mediaStage?: MediaSendStage;
+  onOpen?: () => void;
+  onRetry?: () => void;
+};
+
+function getPreviewSize(width?: number | null, height?: number | null) {
+  const ratio = width && height ? width / height : 4 / 3;
+  const clampedRatio = Math.min(1.6, Math.max(0.68, ratio));
+  const previewWidth = 250;
+  return {
+    width: previewWidth,
+    height: Math.round(previewWidth / clampedRatio),
+  };
+}
+
+export function MediaMessageBubble({
+  uri,
+  width,
+  height,
+  caption,
+  time,
+  outgoing = false,
+  status,
+  mediaStage,
+  onOpen,
+  onRetry,
+}: MediaMessageBubbleProps) {
+  const theme = useAppTheme();
+  const preview = getPreviewSize(width, height);
+
+  const stageLabel = mediaStage === 'preparing'
+    ? 'Preparing photo…'
+    : mediaStage === 'uploading'
+      ? 'Uploading photo…'
+      : mediaStage === 'committing'
+        ? 'Sending photo…'
+        : null;
+
+  const statusContent = () => {
+    if (!outgoing || !status) return null;
+
+    if (status === 'sending') {
+      return <AppText variant="micro" tone="tertiary">Sending…</AppText>;
+    }
+
+    if (status === 'failed') {
+      return (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Retry sending photo"
+          disabled={!onRetry}
+          hitSlop={6}
+          onPress={onRetry}>
+          <AppText variant="micro" tone="danger">Not sent · Tap to retry</AppText>
+        </Pressable>
+      );
+    }
+
+    return (
+      <AppIcon
+        name={
+          status === 'sent'
+            ? { ios: 'checkmark', android: 'check', web: 'check' }
+            : { ios: 'checkmark.circle.fill', android: 'done_all', web: 'done_all' }
+        }
+        size={14}
+        color={status === 'read' ? theme.colors.primary : theme.colors.textTertiary}
+      />
+    );
+  };
+
+  return (
+    <View
+      style={[
+        styles.bubble,
+        outgoing ? styles.outgoing : styles.incoming,
+        {
+          backgroundColor: outgoing ? theme.colors.outgoingBubble : theme.colors.incomingBubble,
+          borderColor: status === 'failed' ? theme.colors.danger : theme.colors.border,
+        },
+      ]}>
+      <Pressable
+        accessibilityRole={uri ? 'button' : undefined}
+        accessibilityLabel={uri ? 'Open photo' : 'Photo preview unavailable'}
+        disabled={!uri || !onOpen}
+        onPress={onOpen}
+        style={[styles.imageShell, preview, { backgroundColor: theme.colors.surfaceMuted }]}>
+        {uri ? (
+          <Image
+            source={{ uri }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            transition={120}
+            cachePolicy="memory-disk"
+          />
+        ) : (
+          <View style={styles.placeholder}>
+            <AppIcon
+              name={{ ios: 'photo', android: 'image', web: 'image' }}
+              size={34}
+              color={theme.colors.textTertiary}
+            />
+            <AppText variant="caption" tone="tertiary">Photo</AppText>
+          </View>
+        )}
+
+        {stageLabel ? (
+          <View style={styles.progressOverlay}>
+            <ActivityIndicator size="small" color="#FFFFFF" />
+            <AppText variant="micro" style={styles.progressText}>{stageLabel}</AppText>
+          </View>
+        ) : null}
+      </Pressable>
+
+      {caption ? <AppText style={styles.caption}>{caption}</AppText> : null}
+
+      <View style={styles.meta}>
+        <AppText variant="micro" tone="tertiary">{time}</AppText>
+        {statusContent()}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  bubble: {
+    maxWidth: '86%',
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 4,
+    gap: 5,
+  },
+  incoming: { alignSelf: 'flex-start', borderBottomLeftRadius: 6 },
+  outgoing: { alignSelf: 'flex-end', borderBottomRightRadius: 6 },
+  imageShell: { overflow: 'hidden', borderRadius: 14 },
+  placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 7 },
+  progressOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(9, 18, 28, 0.52)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  progressText: { color: '#FFFFFF' },
+  caption: { paddingHorizontal: 8, paddingTop: 2, lineHeight: 20 },
+  meta: {
+    minHeight: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingBottom: 2,
+  },
+});

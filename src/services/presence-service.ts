@@ -5,6 +5,18 @@ import { supabase } from '@/lib/supabase';
 
 const LAST_SEEN_HEARTBEAT_MS = 60_000;
 
+async function removeExistingRealtimeChannel(topic: string) {
+  const realtimeTopic = `realtime:${topic}`;
+  const existing = supabase.getChannels().find((candidate) => candidate.topic === realtimeTopic);
+  if (!existing) return;
+
+  try {
+    await supabase.removeChannel(existing);
+  } catch (error) {
+    console.warn(`Unable to clean up existing Realtime channel ${topic}:`, error);
+  }
+}
+
 export type PeerPresenceState = {
   online: boolean;
   lastSeenAt: string | null;
@@ -114,6 +126,14 @@ export function subscribeToOwnPresence(userId: string) {
       await supabase.realtime.setAuth();
       if (disposed) return;
 
+      // React 19 development Strict Mode can mount, clean up, and immediately
+      // remount effects. Supabase returns an already-existing channel for the
+      // same topic, and Presence callbacks cannot be added after subscribe().
+      // Ensure any stale same-topic channel is fully removed before registering
+      // callbacks/subscribing on a fresh instance.
+      await removeExistingRealtimeChannel(`presence:${userId}`);
+      if (disposed) return;
+
       channel = supabase.channel(`presence:${userId}`, {
         config: {
           private: true,
@@ -149,38 +169,51 @@ export function subscribeToOwnPresence(userId: string) {
   };
 }
 
-export function subscribeToPeerPresence(
-  peerUserId: string,
-  onChange: (state: PeerPresenceState) => void,
-) {
-  let disposed = false;
-  let channel: RealtimeChannel | null = null;
-  let lastOnline = false;
-  let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+type PeerPresenceListener = (state: PeerPresenceState) => void;
 
+type PeerPresenceEntry = {
+  peerUserId: string;
+  channel: RealtimeChannel | null;
+  listeners: Set<PeerPresenceListener>;
+  state: PeerPresenceState;
+  lastOnline: boolean;
+  disposed: boolean;
+  refreshTimer: ReturnType<typeof setTimeout> | null;
+  cleanupTimer: ReturnType<typeof setTimeout> | null;
+};
+
+const peerPresenceEntries = new Map<string, PeerPresenceEntry>();
+const PEER_PRESENCE_CLEANUP_DELAY_MS = 500;
+
+function emitPeerPresence(entry: PeerPresenceEntry, state: PeerPresenceState) {
+  entry.state = state;
+  entry.listeners.forEach((listener) => listener(state));
+}
+
+async function startPeerPresenceEntry(entry: PeerPresenceEntry) {
   const refreshLastSeen = async (online = false) => {
     try {
-      const lastSeenAt = await getUserLastSeen(peerUserId);
-      if (!disposed) onChange({ online, lastSeenAt });
+      const lastSeenAt = await getUserLastSeen(entry.peerUserId);
+      if (!entry.disposed) emitPeerPresence(entry, { online, lastSeenAt });
     } catch (error) {
-      if (!disposed) console.warn('Unable to load peer last seen:', error);
+      if (!entry.disposed) console.warn('Unable to load peer last seen:', error);
     }
   };
 
   const syncPresence = () => {
-    if (!channel || disposed) return;
-    const online = hasOnlinePeer(channel, peerUserId);
+    if (!entry.channel || entry.disposed) return;
+    const online = hasOnlinePeer(entry.channel, entry.peerUserId);
 
     if (online) {
-      lastOnline = true;
-      onChange({ online: true, lastSeenAt: new Date().toISOString() });
+      entry.lastOnline = true;
+      emitPeerPresence(entry, { online: true, lastSeenAt: new Date().toISOString() });
       return;
     }
 
-    if (lastOnline) {
-      lastOnline = false;
-      if (refreshTimer) clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(() => void refreshLastSeen(false), 250);
+    if (entry.lastOnline) {
+      entry.lastOnline = false;
+      if (entry.refreshTimer) clearTimeout(entry.refreshTimer);
+      entry.refreshTimer = setTimeout(() => void refreshLastSeen(false), 250);
     } else {
       void refreshLastSeen(false);
     }
@@ -188,31 +221,90 @@ export function subscribeToPeerPresence(
 
   void refreshLastSeen(false);
 
-  void (async () => {
-    try {
-      await supabase.realtime.setAuth();
-      if (disposed) return;
+  try {
+    await supabase.realtime.setAuth();
+    if (entry.disposed) return;
 
-      channel = supabase
-        .channel(`presence:${peerUserId}`, {
-          config: { private: true, presence: { enabled: true } },
-        })
-        .on('presence', { event: 'sync' }, syncPresence)
-        .subscribe((status: string, error?: Error) => {
-          if (disposed) return;
-          if (status === 'SUBSCRIBED') syncPresence();
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.warn('PulseChat peer presence channel:', status, error ?? 'No error details');
-          }
-        });
-    } catch (error) {
-      if (!disposed) console.warn('Unable to observe peer presence:', error);
-    }
-  })();
+    // supabase-js returns the already-registered channel when the topic exists.
+    // A stale HMR/dev channel would therefore reject new Presence callbacks.
+    // Remove it before building the single shared observer for this peer.
+    await removeExistingRealtimeChannel(`presence:${entry.peerUserId}`);
+    if (entry.disposed) return;
+
+    const channel = supabase
+      .channel(`presence:${entry.peerUserId}`, {
+        config: { private: true, presence: { enabled: true } },
+      })
+      .on('presence', { event: 'sync' }, syncPresence);
+
+    entry.channel = channel;
+
+    channel.subscribe((status: string, error?: Error) => {
+      if (entry.disposed) return;
+      if (status === 'SUBSCRIBED') syncPresence();
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('PulseChat peer presence channel:', status, error ?? 'No error details');
+      }
+    });
+  } catch (error) {
+    if (!entry.disposed) console.warn('Unable to observe peer presence:', error);
+  }
+}
+
+function createPeerPresenceEntry(peerUserId: string): PeerPresenceEntry {
+  const entry: PeerPresenceEntry = {
+    peerUserId,
+    channel: null,
+    listeners: new Set(),
+    state: { online: false, lastSeenAt: null },
+    lastOnline: false,
+    disposed: false,
+    refreshTimer: null,
+    cleanupTimer: null,
+  };
+
+  peerPresenceEntries.set(peerUserId, entry);
+  void startPeerPresenceEntry(entry);
+  return entry;
+}
+
+export function subscribeToPeerPresence(
+  peerUserId: string,
+  onChange: (state: PeerPresenceState) => void,
+) {
+  let entry = peerPresenceEntries.get(peerUserId);
+  if (!entry || entry.disposed) entry = createPeerPresenceEntry(peerUserId);
+
+  if (entry.cleanupTimer) {
+    clearTimeout(entry.cleanupTimer);
+    entry.cleanupTimer = null;
+  }
+
+  entry.listeners.add(onChange);
+  onChange(entry.state);
 
   return () => {
-    disposed = true;
-    if (refreshTimer) clearTimeout(refreshTimer);
-    if (channel) void supabase.removeChannel(channel);
+    entry!.listeners.delete(onChange);
+    if (entry!.listeners.size > 0 || entry!.cleanupTimer) return;
+
+    // React 19 development Strict Mode intentionally does an immediate
+    // effect cleanup/remount. Keep the shared observer alive briefly so the
+    // remount reuses it instead of racing an asynchronous channel removal.
+    entry!.cleanupTimer = setTimeout(() => {
+      if (entry!.listeners.size > 0) {
+        entry!.cleanupTimer = null;
+        return;
+      }
+
+      entry!.disposed = true;
+      if (entry!.refreshTimer) clearTimeout(entry!.refreshTimer);
+      entry!.refreshTimer = null;
+      entry!.cleanupTimer = null;
+      peerPresenceEntries.delete(peerUserId);
+
+      const channelToRemove = entry!.channel;
+      entry!.channel = null;
+      if (channelToRemove) void supabase.removeChannel(channelToRemove);
+    }, PEER_PRESENCE_CLEANUP_DELAY_MS);
   };
 }

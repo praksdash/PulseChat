@@ -50,3 +50,20 @@ Returns a last-seen timestamp only for self or a user sharing a conversation wit
 ### Realtime topics
 - `presence:<user_uuid>` — Presence online/offline state.
 - `typing:<conversation_uuid>` — ephemeral typing Broadcast.
+
+## Phase 12 image media
+
+### `create_image_message(...)`
+Authenticated `SECURITY DEFINER` RPC. Derives the sender from `auth.uid()`, verifies conversation membership, requires the canonical private Storage path, and idempotently creates/reuses one `image` message plus its `attachments` row.
+
+### `list_conversation_messages(...)`
+Phase 12 extends each row with the first attachment's ID, private storage path, MIME type, original file name, size and dimensions. The private object URL is not stored in PostgreSQL; clients generate temporary signed URLs after RLS-authorized history access.
+
+### Storage bucket `chat-media`
+Private. Object format:
+`<conversation_uuid>/<uploader_uuid>/<client_message_uuid>.jpg`
+
+Members may read objects for their conversations. Upload/delete requires the object's uploader folder to match `auth.uid()`.
+
+### Realtime event `media_message_ready`
+Private `conversation:<uuid>` Broadcast sent after image attachment metadata commits. Clients reconcile message history so the ordinary message INSERT event cannot race attachment creation.

@@ -69,3 +69,18 @@ Message INSERT remains durable first. The Phase 9 trigger is extended in Phase 1
 `public.user_presence` stores only durable `last_seen_at` and `updated_at` timestamps. It does not store an `is_online` flag because online/offline is ephemeral and comes from Supabase Realtime Presence.
 
 Direct table access is revoked from mobile roles. The app uses `touch_my_last_seen()` for its own heartbeat and `get_user_last_seen(target_user_id)` only for users that share a conversation with the caller.
+
+## Phase 12 attachment/media architecture
+
+`public.attachments` is now active for image messages. One Phase 12 image message has one attachment row with:
+- `message_id`
+- uploader
+- private `chat-media` bucket/path
+- MIME type
+- original file name
+- compressed byte size
+- width/height
+
+The durable database stores only the private object path, never a permanent public URL. `list_conversation_messages` projects the attachment fields alongside each message; the client then requests a temporary signed URL through Storage RLS.
+
+Image DB creation is performed by `create_image_message`, which uses the existing `(sender_id, client_message_id)` uniqueness guarantee for idempotent retry.

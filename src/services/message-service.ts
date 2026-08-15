@@ -1,6 +1,7 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import { supabase } from '@/lib/supabase';
+import { hydrateMessageMediaUrls } from '@/services/media-service';
 import type { Message } from '@/types/database';
 import type { MessageCursor, MessagePageRow, ReceiptCursorEvent } from '@/types/message';
 
@@ -31,7 +32,7 @@ export async function listConversationMessages(
   });
 
   if (error) throw new Error(error.message);
-  return data ?? [];
+  return hydrateMessageMediaUrls((data ?? []) as MessagePageRow[]);
 }
 
 export async function sendTextMessage(input: {
@@ -93,6 +94,7 @@ type SubscribeOptions = {
   conversationId: string;
   onMessage: (message: Message) => void;
   onReceiptState?: (event: ReceiptCursorEvent) => void;
+  onMediaReady?: (messageId: string | null) => void;
   onStateChange?: (state: RealtimeState) => void;
   onError?: (error: unknown) => void;
 };
@@ -169,6 +171,7 @@ export function subscribeToConversationMessages({
   conversationId,
   onMessage,
   onReceiptState,
+  onMediaReady,
   onStateChange,
   onError,
 }: SubscribeOptions) {
@@ -201,6 +204,19 @@ export function subscribeToConversationMessages({
           const receipt = extractReceiptCursor(event, 'read');
           if (!receipt || receipt.conversationId !== conversationId) return;
           onReceiptState?.(receipt);
+        })
+        .on('broadcast', { event: 'media_message_ready' }, (event: unknown) => {
+          if (!event || typeof event !== 'object') {
+            onMediaReady?.(null);
+            return;
+          }
+          const payload = (event as Record<string, unknown>).payload;
+          if (!payload || typeof payload !== 'object') {
+            onMediaReady?.(null);
+            return;
+          }
+          const messageId = (payload as Record<string, unknown>).message_id;
+          onMediaReady?.(typeof messageId === 'string' ? messageId : null);
         })
         .subscribe((status: string, error?: Error) => {
           if (disposed) return;

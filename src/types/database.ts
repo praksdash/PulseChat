@@ -318,6 +318,49 @@ export type Database = {
           edited_at: string | null;
           deleted_at: string | null;
           delivery_status: 'sent' | 'delivered' | 'read' | null;
+          attachment_id: string | null;
+          attachment_storage_bucket: string | null;
+          attachment_storage_path: string | null;
+          attachment_mime_type: string | null;
+          attachment_file_name: string | null;
+          attachment_file_size: number | null;
+          attachment_width: number | null;
+          attachment_height: number | null;
+          attachment_duration_ms: number | null;
+        }>;
+      };
+      create_image_message: {
+        Args: {
+          target_conversation_id: string;
+          target_client_message_id: string;
+          target_storage_path: string;
+          target_file_name?: string | null;
+          target_file_size?: number | null;
+          target_width?: number | null;
+          target_height?: number | null;
+          target_caption?: string | null;
+        };
+        Returns: Array<{
+          id: string;
+          conversation_id: string;
+          sender_id: string | null;
+          client_message_id: string;
+          message_type: 'text' | 'image' | 'video' | 'audio' | 'voice' | 'file' | 'system';
+          body: string | null;
+          reply_to_message_id: string | null;
+          created_at: string;
+          edited_at: string | null;
+          deleted_at: string | null;
+          delivery_status: 'sent' | 'delivered' | 'read' | null;
+          attachment_id: string | null;
+          attachment_storage_bucket: string | null;
+          attachment_storage_path: string | null;
+          attachment_mime_type: string | null;
+          attachment_file_name: string | null;
+          attachment_file_size: number | null;
+          attachment_width: number | null;
+          attachment_height: number | null;
+          attachment_duration_ms: number | null;
         }>;
       };
       get_my_total_unread_count: {

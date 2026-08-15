@@ -37,8 +37,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow PulseChat to access your photos so you can choose a profile picture.",
-          "cameraPermission": false,
+          "photosPermission": "Allow PulseChat to access your photos so you can choose images to send in chats or use as your profile picture.",
+          "cameraPermission": "Allow PulseChat to use your camera so you can take photos to send in chats.",
           "microphonePermission": false
         }
       ]

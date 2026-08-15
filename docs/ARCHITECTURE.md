@@ -83,3 +83,30 @@ Receipt updates are broadcast as a monotonic `through_created_at` cursor instead
 - Phase 12: chat media
 - Phase 13: reply/edit/delete/reactions
 - Phase 14: group UI/admin semantics
+
+## Phase 12 image send flow
+
+```text
+pick/capture image
+      ↓
+resize to max 1600px + JPEG compress
+      ↓
+optimistic local photo bubble
+      ↓
+private Storage upload
+conversation/user/client-message.jpg
+      ↓
+create_image_message RPC
+      ├─ durable messages row
+      └─ attachments metadata row
+      ↓
+media_message_ready private Broadcast
+      ↓
+peer reconciles message history
+      ↓
+Storage SELECT RLS + temporary signed URL
+      ↓
+image bubble / full-screen viewer
+```
+
+The Storage bucket is private. PostgreSQL remains the source of truth for message/attachment metadata; Storage owns the binary object; Realtime only accelerates reconciliation.

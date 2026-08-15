@@ -10,3 +10,6 @@ export * from './search-bar';
 export * from './settings-row';
 export * from './surface-card';
 export * from './user-row';
+export * from './attachment-picker-modal';
+export * from './media-message-bubble';
+export * from './media-viewer';

@@ -37,3 +37,14 @@ Phase 21 will add rate limiting/abuse review, block/report enforcement, deletion
 - `typing:<conversation_uuid>` Broadcast SELECT/INSERT is limited to conversation members.
 - Typing uses a separate topic from database-originated `conversation:<uuid>` message/receipt events so clients cannot gain write access to trusted durable-message events.
 - `user_presence` is not directly queryable by authenticated mobile clients.
+
+## Phase 12 private chat media
+
+- `chat-media` is private; it is never exposed through `getPublicUrl`.
+- Storage SELECT requires current conversation membership.
+- Storage INSERT/DELETE additionally requires the second path segment to equal `auth.uid()`.
+- The client cannot choose another `sender_id` in `create_image_message`; the function derives the sender server-side.
+- The DB RPC requires the exact canonical path `conversation/user/client-message.jpg`.
+- Direct client inserts into `public.messages` are now RLS-restricted to `message_type = 'text'`; image messages must use the media RPC.
+- Signed URLs are short-lived delivery artifacts and are not persisted in database rows.
+- No service-role/secret key is present in the mobile client.

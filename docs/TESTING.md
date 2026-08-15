@@ -61,3 +61,17 @@ Typing/presence is Phase 11; media is Phase 12.
 5. A foregrounds PulseChat: Realtime reconnects if needed and A becomes online again.
 6. A non-member must be denied subscription to another conversation's typing topic.
 7. A user may publish Presence only to `presence:<their own uuid>`.
+
+## Phase 12 image media tests
+
+1. Run `supabase/phase12_verify.sql`; `chat-media` must be private and anon execute on `create_image_message` must be false.
+2. A chooses a library photo; an optimistic preview should appear immediately and progress through preparing/uploading/sending.
+3. B should receive the image without manually refreshing the conversation.
+4. B taps the image and gets a full-screen preview.
+5. Delivered/read ticks for the image must follow the Phase 10 behavior.
+6. Restart both apps; image history must reload with a newly signed private URL.
+7. Test camera capture on Android/iOS.
+8. Turn network off before sending; the local image should fail visibly. Restore network and tap retry. One durable message and one Storage object must exist.
+9. Repeated/retried send must reuse the same `client_message_id` and canonical object path.
+10. Account C, not in the conversation, must be unable to read the private object or sign it through the Storage API.
+11. Verify text, receipts, typing and presence still work after the Phase 12 migration.
