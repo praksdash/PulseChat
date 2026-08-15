@@ -51,7 +51,7 @@ function toChatRow(item: ConversationListItem, currentUserId: string | undefined
     id: item.conversation_id,
     name: item.display_name,
     avatarUri: getAvatarPublicUrl(item.avatar_path),
-    preview: item.last_message_preview ?? 'Conversation ready — send your first message in Phase 9.',
+    preview: item.last_message_preview ?? 'No messages yet — say hello.',
     time: formatConversationTime(item.last_message_created_at ?? item.last_activity_at),
     sentByMe: hasLastMessage && item.last_message_sender_id === currentUserId,
   };

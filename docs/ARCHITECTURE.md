@@ -10,93 +10,90 @@ Expo / React Native / TypeScript
         ├── reusable UI/theme
         ├── profile + discovery services
         ├── conversation service
+        ├── message service + conversation-message hook
         └── typed Supabase client
                  │
                  ├── Supabase Auth
                  ├── PostgreSQL + RLS
-                 │      ├── self-only profile table access
-                 │      ├── controlled discovery RPCs
-                 │      ├── messaging schema/RLS
-                 │      └── Phase 8 conversation RPCs
-                 └── Supabase Storage (avatars)
+                 │      ├── profiles/discovery
+                 │      ├── conversations/members
+                 │      └── durable messages
+                 ├── Supabase Realtime
+                 │      └── private conversation:<uuid> Broadcast
+                 └── Supabase Storage
+                        └── avatars
 ```
 
-## Phase 8 direct-chat flow
+## Phase 9 send flow
 
 ```text
-Discovered user profile
-        │
-        ▼
-Start chat
-        │
-        ▼
-conversation-service
-        │
-        ▼
-public.create_or_get_direct_conversation(target_user_id)
-        │
-        ├── require auth.uid()
-        ├── reject self-chat
-        ├── validate target profile
-        ├── compute canonical direct_key
-        ├── INSERT conversation ON CONFLICT DO NOTHING
-        ├── create exactly two member rows if new
-        └── return conversation UUID
-                │
-                ▼
-       /chat/[conversationId]
-```
-
-The partial unique index on `conversations.direct_key` is the database-level race-condition boundary. Two clients can request the same pair concurrently, but only one direct-conversation row can commit.
-
-## Real Chats list
-
-```text
-Chats tab focus / pull refresh
-        │
-        ▼
-listMyConversations()
-        │
-        ▼
-public.list_my_conversations()
-        │
-        ├── filters by auth.uid() membership
-        ├── joins only safe peer profile fields
-        ├── returns latest message preview metadata
-        └── orders by conversation activity
-                │
-                ▼
-              ChatRow
-```
-
-`public.profiles` remains self-only through normal table RLS. The security-definer conversation RPC exposes only the peer fields the chat UI needs.
-
-## Conversation route protection
-`get_conversation_summary` returns a row only when the caller has a `conversation_members` row for the target UUID. Knowing a conversation UUID is not sufficient to retrieve its header context.
-
-## Message lifecycle prepared for Phase 9
-
-```text
-client creates client_message_id
-        ↓
-optimistic message
-        ↓
+User taps Send
+      ↓
+client generates client_message_id UUID
+      ↓
+optimistic bubble appears immediately
+      ↓
 INSERT public.messages
+      ↓
+Phase 6 RLS verifies sender == auth.uid() + membership
+      ↓
+UNIQUE(sender_id, client_message_id) prevents retry duplicates
+      ↓
+PostgreSQL commits durable row
+      ├── touch conversation.last_message_at
+      └── Phase 9 AFTER INSERT trigger
+                 ↓
+        realtime.broadcast_changes()
+                 ↓
+       private topic conversation:<uuid>
+                 ↓
+      authorized conversation members
+```
+
+The application never treats a WebSocket event as durable storage. Initial load and reconnect reconciliation always read PostgreSQL.
+
+## Realtime authorization
+
+Clients subscribe with:
+
+```text
+conversation:<conversation UUID>
+private = true
+```
+
+A SELECT policy on `realtime.messages` permits Broadcast reception only when `auth.uid()` has a matching row in `public.conversation_members` for that topic. Phase 9 does not grant app clients INSERT permission into Realtime Broadcast topics; sends happen through durable `public.messages` INSERTs.
+
+## Message history
+
+```text
+Newest 30
+   ↓ user scrolls upward
+cursor = oldest server (created_at, id)
+   ↓
+previous 30
+```
+
+`public.list_conversation_messages` is `SECURITY INVOKER`, so normal `messages` RLS remains active. The existing `(conversation_id, created_at DESC, id DESC)` index supports the ordering/cursor.
+
+## Optimistic retry
+
+```text
+optimistic client_message_id X
         ↓
-RLS sender/member check
+request reaches DB but network response is lost
         ↓
-unique(sender_id, client_message_id) dedupe
+retry uses X again
         ↓
-server created_at ordering
+UNIQUE violation instead of duplicate row
         ↓
-conversation.last_message_at trigger
+client fetches committed row for X
         ↓
-Realtime Broadcast after commit (Phase 9)
+optimistic bubble becomes server bubble
 ```
 
 ## Deferred responsibilities
-- Phase 9: text messaging + Realtime Broadcast + pagination
-- Phase 10: delivery/read UI and service
+- Phase 10: delivery/read receipts + unread/read cursor UI
 - Phase 11: typing/presence
-- Phase 12: media storage
+- Phase 12: media storage/messages
+- Phase 13: replies/edit/delete/reactions
 - Phase 14: group management

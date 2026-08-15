@@ -1,50 +1,55 @@
 # PulseChat Testing
 
-## Phase 8 migration verification
-After running `202608150005_phase8_direct_chat_creation.sql`, run `supabase/phase8_verify.sql`.
+## Phase 9 migration verification
+After `202608150006_phase9_realtime_text_messaging.sql`, run `supabase/phase9_verify.sql`.
 
 Verify:
-- all three Phase 8 RPCs exist
-- each is `SECURITY DEFINER`
-- authenticated can execute them
-- anon/public cannot execute them
-- the unique direct-key index exists
-- no existing direct conversation has a member count other than 2
+- `list_conversation_messages` exists and is not SECURITY DEFINER
+- authenticated execute = true; anon execute = false
+- `broadcast_new_message` is an AFTER INSERT trigger on `public.messages`
+- `pulsechat_members_receive_conversation_broadcasts` exists on `realtime.messages`
+- Phase 6 message indexes still exist
 
-## Happy-path test — two accounts
-Use Account A and Account B.
+## Happy path — two live clients
+1. Login as Account A on client/device A.
+2. Login as Account B on client/device B.
+3. Open the same direct conversation on both.
+4. Send `Hello from A` on A.
+5. The outgoing bubble appears immediately on A.
+6. The message becomes sent after PostgreSQL acknowledgement.
+7. B receives it without manually refreshing.
+8. Send a reply from B and verify A receives it live.
+9. Close/reopen the chat and confirm history is loaded from PostgreSQL.
 
-1. Login as A.
-2. Search for B and open B's public profile.
-3. Tap Start chat.
-4. A real conversation route opens.
-5. Return to Chats; B is listed.
-6. Return to B's profile and tap Start chat again.
-7. Confirm the same conversation UUID is reused.
-8. Login as B and open Chats or pull to refresh.
-9. Confirm the same conversation appears for B.
+## Retry/idempotency
+1. Disable network.
+2. Send a message.
+3. The optimistic bubble should become `Not sent · Tap to retry`.
+4. Restore network.
+5. Tap the failed state to retry.
+6. Exactly one message row must exist for that `client_message_id`.
 
-Database check:
-- exactly one `public.conversations` row exists for A/B
-- exactly two `public.conversation_members` rows exist for that conversation
+## Pagination
+1. Produce at least 35 messages in one conversation.
+2. Reopen the conversation.
+3. Initial page should load quickly.
+4. Scroll upward to load older history.
+5. No duplicate rows should appear at the page boundary.
 
-## Failure-path tests
-- Disable network and tap Start chat: an inline error should appear without navigation.
-- Disable network on Chats: retry state appears when no cached list exists.
-- Restore network and retry/pull-to-refresh.
-- Navigate to an unknown conversation UUID: the screen must show Conversation unavailable.
+## Realtime authorization security
+- Account C, not a member of the A/B conversation, must not be able to join its private `conversation:<uuid>` Broadcast topic.
+- Account C must not be able to read A/B rows through `list_conversation_messages` or normal message SELECT.
+- Anon must not execute `list_conversation_messages`.
 
-## Concurrency/idempotency test
-From A and B, trigger Start chat for each other as close together as practical. Then query the database. There must still be only one canonical direct conversation for the pair.
-
-## Security tests
-- An anon call to any Phase 8 RPC must fail execute permission.
-- A signed-in user cannot obtain `get_conversation_summary` for a conversation they do not belong to.
-- A client cannot directly insert `public.conversations` or `public.conversation_members` because table privileges remain revoked.
-- Phase 8 RPC responses contain no email/auth metadata.
+## Reconnect/source-of-truth test
+1. Open chat on B.
+2. Temporarily interrupt B's connection.
+3. Send one or more messages from A.
+4. Restore B's connection.
+5. After the channel reconnects, latest-page reconciliation should fill any missed rows from PostgreSQL.
 
 ## Regression
-Authentication, persisted sessions, profile edit/avatar, sign-out, user discovery and all Phase 6 RLS behavior must continue to work.
+Authentication, persisted sessions, profile edit/avatar, sign-out, discovery, direct-chat creation, Chats list and Phase 6 RLS behavior must continue to work.
 
 ## Intentionally deferred
-The composer is disabled. Real text messages and Realtime Broadcast begin in Phase 9.
+Delivered/read receipts and unread counters are Phase 10; typing/presence is Phase 11.

@@ -1,47 +1,54 @@
 # PulseChat API / Data Access
 
-## Profile/discovery RPCs
+## Existing profile/discovery RPCs
+- `public.is_username_available(candidate text)`
+- `public.search_profiles(search_term text, result_limit integer default 20)`
+- `public.get_public_profile(target_user_id uuid)`
 
-### `public.is_username_available(candidate text)`
-Authenticated Phase 5 boolean RPC.
+## Existing conversation RPCs
+- `public.create_or_get_direct_conversation(target_user_id uuid)`
+- `public.list_my_conversations(result_limit integer default 50)`
+- `public.get_conversation_summary(target_conversation_id uuid)`
 
-### `public.search_profiles(search_term text, result_limit integer default 20)`
-Authenticated Phase 7 discovery RPC. Returns only safe public profile fields and never returns auth email/metadata.
+## Phase 9 message history RPC
 
-### `public.get_public_profile(target_user_id uuid)`
-Authenticated Phase 7 public-profile lookup.
-
-## Phase 8 conversation RPCs
-
-### `public.create_or_get_direct_conversation(target_user_id uuid) returns uuid`
-Authenticated-only transactional entry point for direct-chat creation.
+### `public.list_conversation_messages(...)`
+Arguments:
+- `target_conversation_id uuid`
+- `before_created_at timestamptz default null`
+- `before_id uuid default null`
+- `result_limit integer default 30`
 
 Behavior:
-- rejects unauthenticated callers
-- rejects self-chat
-- validates target profile
-- computes the canonical sorted pair key
-- inserts a direct conversation if absent
-- relies on the partial unique `direct_key` index to resolve concurrent races
-- creates exactly two membership rows for a new direct chat
-- returns the existing conversation UUID when the pair already has a chat
+- `SECURITY INVOKER`
+- RLS-protected
+- newest-first stable cursor pagination
+- server limit capped to 50
 
-Clients do not receive INSERT privileges on conversations or conversation membership tables.
+## Phase 9 direct table write
 
-### `public.list_my_conversations(result_limit integer default 50)`
-Authenticated-only chat-list projection.
+### INSERT `public.messages`
+The client sends only:
+- `conversation_id`
+- `sender_id`
+- `client_message_id`
+- `message_type = text`
+- `body`
+- optional future `reply_to_message_id`
 
-Returns:
-- conversation UUID and kind
-- safe peer display name/username/avatar path
-- peer user UUID for direct chats
-- safe latest-message preview metadata
-- last activity timestamp
+RLS and table-column grants enforce the boundary.
 
-The result limit is clamped to 1–100 server-side.
+## Phase 9 Realtime
+Topic:
 
-### `public.get_conversation_summary(target_conversation_id uuid)`
-Authenticated-only route/header projection. Returns a row only if `auth.uid()` is a member of the requested conversation.
+```text
+conversation:<conversation UUID>
+```
 
-## Phase 9
-The message service will use existing RLS-protected INSERT access on `public.messages`, cursor pagination and conversation-scoped Supabase Realtime Broadcast. Database rows remain the durable source of truth.
+Channel config:
+
+```text
+private: true
+```
+
+The client listens for Broadcast event `INSERT`. Database triggers generate the event only after a durable message insert.

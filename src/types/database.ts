@@ -272,6 +272,26 @@ export type Database = {
           last_activity_at: string;
         }>;
       };
+      list_conversation_messages: {
+        Args: {
+          target_conversation_id: string;
+          before_created_at?: string | null;
+          before_id?: string | null;
+          result_limit?: number;
+        };
+        Returns: Array<{
+          id: string;
+          conversation_id: string;
+          sender_id: string | null;
+          client_message_id: string;
+          message_type: 'text' | 'image' | 'video' | 'audio' | 'voice' | 'file' | 'system';
+          body: string | null;
+          reply_to_message_id: string | null;
+          created_at: string;
+          edited_at: string | null;
+          deleted_at: string | null;
+        }>;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
