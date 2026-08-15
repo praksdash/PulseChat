@@ -220,6 +220,26 @@ export type Database = {
         Args: { candidate: string };
         Returns: boolean;
       };
+      search_profiles: {
+        Args: { search_term: string; result_limit?: number };
+        Returns: Array<{
+          id: string;
+          display_name: string;
+          username: string | null;
+          avatar_path: string | null;
+          bio: string | null;
+        }>;
+      };
+      get_public_profile: {
+        Args: { target_user_id: string };
+        Returns: Array<{
+          id: string;
+          display_name: string;
+          username: string | null;
+          avatar_path: string | null;
+          bio: string | null;
+        }>;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

@@ -1,48 +1,41 @@
 # PulseChat Testing
 
-## Phase 6 database migration verification
-After running `202608150003_phase6_messaging_schema.sql`, run `supabase/phase6_verify.sql` in Supabase SQL Editor.
+## Phase 7 migration verification
+After running `202608150004_phase7_user_discovery.sql`, run `supabase/phase7_verify.sql`.
 
-Expected tables:
-- `conversations`
-- `conversation_members`
-- `messages`
-- `message_receipts`
-- `attachments`
+Verify:
+- `search_profiles` exists and is `SECURITY DEFINER`
+- `get_public_profile` exists and is `SECURITY DEFINER`
+- both trigram indexes exist
+- `public.profiles` still has RLS enabled
+- no broad authenticated SELECT policy was added to profiles
+- discovery function EXECUTE is available to authenticated but not anon
 
-Each Phase 6 table must report `rls_enabled = true`.
+## Application test — two accounts
+Use two real accounts, A and B.
 
-## Metadata checks
-Verify the policy list includes membership-gated SELECT policies and self-only receipt/read-state policies.
+1. Account B sets a display name, username, bio and optional avatar.
+2. Account A opens Search.
+3. Enter fewer than 2 characters: no network search/results should run.
+4. Search for part of B's display name.
+5. Search for part of B's username.
+6. B appears with avatar/name/username/bio preview.
+7. A must never appear in A's own results.
+8. Tap B: the public-profile route opens and shows only safe public fields.
+9. `Start chat` is disabled and clearly marked for Phase 8.
+10. Sign out and verify protected routes still return to Login.
 
-Verify important indexes exist for:
-- direct-key uniqueness
-- memberships by `user_id`
-- message cursor pagination
-- sender/client-message deduplication
-- receipt lookup
-- attachment lookup
+## Failure-path tests
+- Turn off networking, search, and confirm a retry state is shown.
+- Search a random string and confirm the no-results state.
+- Navigate to a non-existent user UUID and confirm Profile unavailable.
+- Type quickly (`pr`, `pra`, `prak`): an older request must not overwrite a newer query's results.
 
-## Application regression test
-Because Phase 6 does not change active UI behavior:
-1. Launch Android app.
-2. Existing authenticated session restores.
-3. Profile screen loads.
-4. Edit Profile still works.
-5. Avatar still loads.
-6. Sign out still returns to Login.
-7. Sign in again succeeds.
+## Privacy/security tests
+- With an authenticated client, a direct `.from('profiles').select('*')` must still return only the caller's own row because existing RLS remains self-only.
+- An unauthenticated/anon call to `search_profiles` must not execute.
+- Search responses must contain no email/auth metadata.
+- A query containing `%` or `_` must be treated as literal search text rather than a match-all wildcard.
 
-The Chats screen is still intentionally mock data until Phase 8/9.
-
-## Security tests scheduled with feature activation
-When Phase 8/9 adds real chat access, test with at least three accounts:
-- User A and B belong to conversation AB.
-- User C must not SELECT conversation AB.
-- User C must not SELECT messages from AB even with known UUIDs.
-- User A must not INSERT a message with `sender_id = B`.
-- A retry with the same `(sender_id, client_message_id)` must not create a duplicate.
-- A reply must not reference a message in another conversation.
-
-## Later automated tests
-Add pgTAP database authorization tests once the Supabase local-development/test harness is introduced. Manual SQL metadata verification is sufficient for this schema-only phase.
+## Regression
+Authentication, profile editing, avatars, sign-out and Phase 6 schema behavior must remain unchanged.

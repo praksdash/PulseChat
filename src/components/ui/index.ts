@@ -9,3 +9,4 @@ export * from './message-bubble';
 export * from './search-bar';
 export * from './settings-row';
 export * from './surface-card';
+export * from './user-row';

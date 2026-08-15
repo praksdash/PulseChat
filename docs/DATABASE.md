@@ -31,7 +31,15 @@ Created in Phase 4 and expanded in Phase 5.
 - `created_at timestamptz`
 - `updated_at timestamptz`
 
-Phase 7 will add controlled profile discovery. Until then, profile SELECT remains self-only.
+Phase 7 adds controlled authenticated discovery through narrow database functions while normal profile-table SELECT remains self-only.
+
+### Phase 7 discovery API
+
+`public.search_profiles(search_term, result_limit)` searches only display name/username and returns safe public fields. It requires at least 2 characters and caps output at 20 rows.
+
+`public.get_public_profile(target_user_id)` returns the same safe fields for one profile route. Neither function exposes auth email or metadata.
+
+Trigram GIN indexes on lowercase `display_name` and `username` support substring discovery without changing profile RLS.
 
 ## `public.conversations`
 One row per direct or group conversation.
@@ -135,7 +143,7 @@ Phase 8 will add a narrow transactional database function that:
 That avoids a race where two devices create duplicate direct chats.
 
 ## Future migrations
-- Phase 7: controlled user discovery
+- Phase 7: controlled user discovery ✅
 - Phase 8: direct-chat creation RPC and real chat list
 - Phase 9: text-message service + Realtime Broadcast
 - Phase 10: delivery/read service
