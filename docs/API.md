@@ -1,13 +1,16 @@
-# PulseChat API / Service Boundary
+# PulseChat API / Data Access
 
-## Current status
-Phase 3 has no remote API calls.
+## Phase 4
+The client accesses Supabase directly through `@supabase/supabase-js` using the publishable key and the signed-in user's JWT.
 
-## Planned boundaries
-- Supabase Auth for authentication/session operations.
-- PostgreSQL through Supabase for persistent application data.
-- Supabase Realtime for live messaging/presence events.
-- Supabase Storage for private media.
-- Edge Functions only for trusted server-side operations such as notification fan-out when required.
+### Auth operations
+- `supabase.auth.signUp`
+- `supabase.auth.signInWithPassword`
+- `supabase.auth.getSession`
+- `supabase.auth.onAuthStateChange`
+- `supabase.auth.signOut`
 
-UI components in `src/components/ui` must remain independent of Supabase so they can be reused and tested without backend coupling.
+### Profile operation
+- SELECT own row from `public.profiles`
+
+There is no custom REST API or Edge Function in Phase 4.

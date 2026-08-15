@@ -23,7 +23,7 @@ export default function SearchScreen() {
     <SafeAreaView edges={['top']} style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
         <AppText variant="title">Find people</AppText>
-        <AppText variant="caption" tone="secondary">Local demo search for Phase 3</AppText>
+        <AppText variant="caption" tone="secondary">Local demo search • Real user discovery arrives in Phase 7</AppText>
       </View>
       <View style={styles.searchWrap}>
         <SearchBar value={query} onChangeText={setQuery} placeholder="Name or username" autoCapitalize="none" />

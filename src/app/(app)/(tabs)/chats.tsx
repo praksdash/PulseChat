@@ -9,7 +9,7 @@ const DEMO_CHATS: ChatRowModel[] = [
   { id: 'demo-alex', name: 'Alex Morgan', preview: 'The new interface looks great.', time: '12:30', unread: 2, online: true },
   { id: 'demo-team', name: 'Pulse Team', preview: 'Groups arrive after core messaging.', time: '11:05', sentByMe: true },
   { id: 'demo-maya', name: 'Maya Chen', preview: 'See you tomorrow 👋', time: 'Yesterday', online: false },
-  { id: 'demo-design', name: 'Design Crew', preview: 'Phase 3 components are ready.', time: 'Tue', unread: 5 },
+  { id: 'demo-design', name: 'Design Crew', preview: 'Authentication foundation is ready.', time: 'Tue', unread: 5 },
 ];
 
 export default function ChatsScreen() {
@@ -18,10 +18,7 @@ export default function ChatsScreen() {
   const openChat = (chat: ChatRowModel) => {
     router.push({
       pathname: '/chat/[conversationId]',
-      params: {
-        conversationId: chat.id,
-        name: chat.name,
-      },
+      params: { conversationId: chat.id, name: chat.name },
     });
   };
 

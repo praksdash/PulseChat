@@ -38,7 +38,7 @@ export default function ConversationScreen() {
         <View style={[styles.datePill, { backgroundColor: theme.colors.surfaceMuted }]}>
           <AppText variant="micro" tone="secondary">TODAY</AppText>
         </View>
-        <MessageBubble text="The Phase 3 design system is now in place." time="12:26" />
+        <MessageBubble text="The PulseChat interface is ready for real messaging phases." time="12:26" />
         <MessageBubble text="Nice — the chat UI already feels like a real messenger." time="12:28" outgoing status="read" />
         <MessageBubble text="Realtime messages will replace these demo bubbles in Phase 9." time="12:30" />
       </View>

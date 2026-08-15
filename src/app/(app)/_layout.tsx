@@ -7,6 +7,7 @@ export default function AppLayout() {
 
   return (
     <Stack
+      initialRouteName="(tabs)"
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: theme.colors.background },

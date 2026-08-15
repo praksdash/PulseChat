@@ -1,18 +1,20 @@
 # PulseChat Database
 
-## Current status
-No database has been created or migrated yet in Phase 3.
+## Phase 4 table: `public.profiles`
 
-## Planned core entities
-- profiles
-- conversations
-- conversation_members
-- messages
-- message_receipts
-- attachments
-- devices
-- user_presence
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid | PK, FK to `auth.users(id)`, cascade delete |
+| display_name | text | Required, 2–60 chars |
+| username | text | Nullable until Phase 5; unique; lowercase pattern when present |
+| avatar_path | text | Nullable; used later with Storage |
+| bio | text | Nullable |
+| created_at | timestamptz | UTC default |
+| updated_at | timestamptz | Updated by trigger |
 
-Additional privacy, reporting, reaction and notification-preference tables will be added when their features are implemented.
+## RLS in Phase 4
+Authenticated users can select and update only the row whose `id = auth.uid()`.
 
-The final SQL schema, indexes, foreign keys and RLS policies will be defined during the database/authentication phases rather than prematurely embedding database assumptions in the UI layer.
+Direct client insert/delete is not granted. A security-definer trigger creates the profile after a new `auth.users` record is inserted.
+
+User discovery is intentionally postponed to Phase 7 rather than making all profiles publicly readable now.

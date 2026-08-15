@@ -1,15 +1,16 @@
 # PulseChat Security
 
-## Current phase
-No backend or user authentication is connected in Phase 3, so no secrets should exist in the mobile source code yet.
+## Phase 4 controls
+- Mobile app uses only the Supabase Project URL and publishable key.
+- Never place `service_role`, secret keys, database passwords or signing secrets in Expo environment variables.
+- `.env` is ignored by Git.
+- Native auth session payload is encrypted before being placed in AsyncStorage; the encryption key is stored in Expo SecureStore.
+- Auth tokens refresh only while the native app is active.
+- Protected Expo Router groups keep signed-out users out of app screens.
+- PostgreSQL RLS remains the real authorization boundary.
+- `profiles` is RLS-enabled.
+- Users can read/update only their own profile in Phase 4.
+- Profile creation is server-side via a security-definer trigger.
 
-## Non-negotiable rules for upcoming phases
-- Never place a Supabase service-role or secret key in the Expo application.
-- Treat mobile clients as untrusted.
-- Enforce conversation and message authorization with PostgreSQL Row-Level Security.
-- Keep private chat media in non-public storage and authorize access server-side/RLS-side.
-- Validate group administration and account mutation permissions at the data layer.
-- Store only client-safe public/publishable configuration in the app.
-
-## Phase 3 security surface
-The current screens contain static/local prototype data only. Login and registration inputs are not submitted or persisted.
+## Important
+`EXPO_PUBLIC_*` values are bundled into the client. Only use values designed to be public, such as the Supabase publishable key. RLS must protect every user-owned table added in later phases.

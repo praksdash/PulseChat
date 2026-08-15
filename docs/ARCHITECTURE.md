@@ -1,51 +1,37 @@
 # PulseChat Architecture
 
-## Current client architecture
+## Client
+React Native + Expo SDK 57 + TypeScript + Expo Router.
 
-```text
-src/app                  Expo Router routes
-   ↓
-src/components/ui        Reusable presentation components
-   ↓
-src/theme                Design tokens and system theme selection
-```
+## Authentication boundary
+`AuthProvider` owns the Supabase session. The root navigator uses `Stack.Protected`:
 
-## Route tree
+- unauthenticated -> `(auth)`
+- authenticated -> `(app)`
 
-```text
-/
-├── (auth)
-│   ├── login
-│   └── register
-└── (app)
-    ├── (tabs)
-    │   ├── chats
-    │   ├── search
-    │   └── profile
-    └── chat/[conversationId]
-```
+No screen-level redirect is trusted as authorization. Route protection is UX/navigation only; database authorization remains enforced by Supabase RLS.
 
-## Phase 3 design-system architecture
+## Auth persistence
+On native platforms Supabase Auth storage uses an encrypted large-value adapter:
 
-The UI does not hard-code a separate palette in every screen. Screens request the active theme through `useAppTheme()`. Reusable primitives own repeated styling and behavior.
+1. Generate an AES-256 key.
+2. Store that key in Expo SecureStore.
+3. Encrypt the Supabase session payload.
+4. Store only encrypted payload bytes in AsyncStorage.
+5. Start token auto-refresh while the app is active and stop it in the background.
 
-Core primitives:
-- AppText
-- AppIcon
-- AppButton
-- AppTextField
-- Avatar
-- SearchBar
-- ChatRow
-- MessageBubble
-- SurfaceCard
-- SettingsRow
-- EmptyState
+Web falls back to Supabase's browser storage behavior.
 
-## Theming
+## Backend
+Supabase provides:
+- Auth
+- PostgreSQL
+- RLS
+- Realtime (later phases)
+- Storage (later phases)
+- Edge Functions (later phases)
 
-The application currently follows the device light/dark appearance automatically. A user-selectable theme preference will be added during the Settings phase. The design tokens are already structured so that feature does not require rewriting individual screens.
+## Profile lifecycle
+Signup -> `auth.users` row -> database trigger -> `public.profiles` row.
 
-## Future integration boundaries
-
-Phase 4 will add an authentication/session layer without replacing the presentation components. Later data features should place Supabase calls in feature/service modules rather than directly coupling database logic to UI primitives.
+The client never needs a privileged key and cannot insert arbitrary profile rows during Phase 4.

@@ -1,67 +1,57 @@
 # PulseChat Project State
 
 ## Current phase
-Phase 3 — Design System
+Phase 4 — Supabase Authentication
 
-## Phase status
-- Phase 0: Complete
-- Phase 1: Complete and verified by developer
-- Phase 2: Complete in this package
-- Phase 3: Implemented in this package; device verification required
+## Completed
+- Phase 1 development environment and Android development build
+- Phase 2 Expo Router navigation skeleton
+- Phase 3 reusable design system and polished messenger UI
+- Phase 4 authentication implementation in source
 
-## Completed features
-- Expo SDK 57 project foundation
-- Expo Router navigation skeleton
-- Login and registration preview routes
-- Chats, Search and Profile tabs
-- Dynamic conversation route
-- System-aware light/dark design tokens
-- Reusable typography component
-- Reusable button component
-- Reusable text-field component with password visibility control
-- Reusable cross-platform icon wrapper using expo-symbols
-- Reusable avatar with online state
-- Reusable chat row
-- Reusable search bar
-- Reusable message bubble with status treatment
-- Reusable surface card, settings row and empty state
-- Premium Phase 3 styling across all prototype screens
+## Phase 4 working target
+- Supabase client configured from `.env`
+- Email/password account creation
+- Email/password sign-in
+- Session persistence across app restarts
+- Encrypted native session storage (AES payload in AsyncStorage, encryption key in Expo SecureStore)
+- Expo Router protected auth/app route groups
+- Automatic `profiles` row creation from `auth.users`
+- Own-profile RLS
+- Authenticated profile display
+- Sign-out
+- Friendly validation and common auth errors
 
-## Working features to verify on Android
-- Login → Register → Back
-- Login → Preview PulseChat → Chats
-- Chats/Search/Profile tabs
-- Chat row → Conversation → Back
-- Local demo search filtering
-- System light/dark appearance adaptation
+## Still requires developer verification
+1. Create/select a Supabase project.
+2. Run `supabase/migrations/202608150001_phase4_auth_profiles.sql` in SQL Editor.
+3. Create `.env` with Project URL and publishable key.
+4. Install Phase 4 dependencies.
+5. Rebuild Android development client because SecureStore/AsyncStorage are native dependencies.
+6. Verify signup, login, persistence, RLS-backed profile read and logout on a physical/emulated Android device.
 
-## Known limitations
-- Authentication is preview-only; no Supabase session exists yet.
-- Search uses local demo users only.
-- Message bubbles are static demo data.
-- Composer is intentionally disabled.
-- Settings rows are visual only.
-- Profile is static prototype data.
+## Intentionally not implemented yet
+- Username/avatar editing (Phase 5)
+- Conversation/message database schema (Phase 6 onward)
+- User search (Phase 7)
+- Realtime messaging
+- Media upload
+- Push notifications
 
 ## Known bugs
-None known after static/type validation. Physical-device verification is still required.
+None known in Phase 4 source. Runtime verification against the developer's Supabase project is still required.
 
-## Database migrations completed
-None. Database work starts in later phases.
+## Database migrations
+- `202608150001_phase4_auth_profiles.sql` — pending developer execution
 
-## Environment variables created
-None required yet.
+## Environment variables
+Required locally in `.env` (never commit):
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
-## Key files added/updated
-- src/theme/*
-- src/components/ui/*
-- src/app/*
-- docs/PROJECT_STATE.md
-- docs/ARCHITECTURE.md
-- docs/TESTING.md
-
-## Recommended Git checkpoint
-`feat: add PulseChat design system`
+## Git checkpoint
+After verification:
+`feat: add Supabase authentication`
 
 ## Next task
-Phase 4 — Authentication with Supabase Auth.
+Phase 5 — User profile: username, avatar, bio and profile editing.
