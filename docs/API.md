@@ -38,3 +38,15 @@ Private. Membership-authorized. Events:
 ### `user:<uuid>`
 Private. Self-authorized only. Event:
 - `inbox_message` — minimal notification that one of the user's conversations received a durable message
+
+## Phase 11 RPCs
+
+### `touch_my_last_seen()`
+Updates only the authenticated user's durable `last_seen_at` timestamp.
+
+### `get_user_last_seen(target_user_id uuid)`
+Returns a last-seen timestamp only for self or a user sharing a conversation with the caller.
+
+### Realtime topics
+- `presence:<user_uuid>` — Presence online/offline state.
+- `typing:<conversation_uuid>` — ephemeral typing Broadcast.

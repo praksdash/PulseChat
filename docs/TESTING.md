@@ -51,3 +51,13 @@ Auth, persistent session, profile/avatar, discovery, chat creation, message send
 
 ## Deferred
 Typing/presence is Phase 11; media is Phase 12.
+
+## Phase 11 manual tests
+
+1. Two authenticated users open the same direct chat: both see the peer as online.
+2. A types continuously: B sees `typing…`; event volume is throttled and does not send for every character.
+3. A stops typing: B clears `typing…` after the idle event; if the false event is lost, B clears after the receiver expiry.
+4. A backgrounds PulseChat: B sees offline/last-seen rather than a false online state.
+5. A foregrounds PulseChat: Realtime reconnects if needed and A becomes online again.
+6. A non-member must be denied subscription to another conversation's typing topic.
+7. A user may publish Presence only to `presence:<their own uuid>`.

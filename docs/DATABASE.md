@@ -63,3 +63,9 @@ Startup/reconnect reconciliation for messages persisted while no WebSocket sessi
 
 ## Realtime
 Message INSERT remains durable first. The Phase 9 trigger is extended in Phase 10 to additionally send minimal `inbox_message` events to each recipient's private `user:<uuid>` topic.
+
+## Phase 11 — Presence
+
+`public.user_presence` stores only durable `last_seen_at` and `updated_at` timestamps. It does not store an `is_online` flag because online/offline is ephemeral and comes from Supabase Realtime Presence.
+
+Direct table access is revoked from mobile roles. The app uses `touch_my_last_seen()` for its own heartbeat and `get_user_last_seen(target_user_id)` only for users that share a conversation with the caller.

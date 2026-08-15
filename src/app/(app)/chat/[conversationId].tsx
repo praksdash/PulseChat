@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppButton, AppIcon, AppText, Avatar, EmptyState, MessageBubble } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useConversationMessages } from '@/hooks/use-conversation-messages';
+import { usePeerPresence } from '@/hooks/use-peer-presence';
+import { useTypingIndicator } from '@/hooks/use-typing-indicator';
 import { MAX_TEXT_MESSAGE_LENGTH } from '@/services/message-service';
 import { getConversationSummary } from '@/services/conversation-service';
 import { getAvatarPublicUrl } from '@/services/profile-service';
@@ -30,6 +32,33 @@ function formatMessageTime(iso: string) {
     hour: 'numeric',
     minute: '2-digit',
   }).format(date);
+}
+
+function formatLastSeen(iso: string | null) {
+  if (!iso) return 'offline';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return 'offline';
+
+  const now = new Date();
+  const differenceMs = now.getTime() - date.getTime();
+  if (differenceMs >= 0 && differenceMs < 60_000) return 'last seen just now';
+
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+
+  if (date.toDateString() === now.toDateString()) return `last seen at ${time}`;
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return `last seen yesterday at ${time}`;
+
+  const day = new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+  }).format(date);
+  return `last seen ${day} at ${time}`;
 }
 
 export default function ConversationScreen() {
@@ -63,6 +92,17 @@ export default function ConversationScreen() {
     retryMessage,
   } = useConversationMessages(conversationId, user?.id);
 
+  const isDirectConversation = summary?.kind === 'direct';
+  const peerPresence = usePeerPresence(
+    isDirectConversation ? summary?.peer_user_id : undefined,
+    Boolean(isDirectConversation),
+  );
+  const { peerTyping, updateTyping, stopTyping } = useTypingIndicator({
+    conversationId,
+    currentUserId: user?.id,
+    enabled: Boolean(isDirectConversation),
+  });
+
   const loadSummary = useCallback(async () => {
     if (!conversationId) {
       setSummaryError('This conversation link is invalid.');
@@ -95,13 +135,24 @@ export default function ConversationScreen() {
 
   const headerSubtitle = useMemo(() => {
     if (realtimeState !== 'connected') return 'Reconnecting…';
-    if (summary?.username) return `@${summary.username}`;
-    return summary?.kind === 'group' ? 'group' : 'direct chat';
-  }, [realtimeState, summary?.kind, summary?.username]);
+    if (isDirectConversation && peerTyping) return 'typing…';
+    if (isDirectConversation && peerPresence.online) return 'online';
+    if (isDirectConversation) return formatLastSeen(peerPresence.lastSeenAt);
+    return summary?.kind === 'group' ? 'group' : (summary?.username ? `@${summary.username}` : 'direct chat');
+  }, [
+    isDirectConversation,
+    peerPresence.lastSeenAt,
+    peerPresence.online,
+    peerTyping,
+    realtimeState,
+    summary?.kind,
+    summary?.username,
+  ]);
 
   const sendDraft = () => {
     if (!canSend) return;
 
+    stopTyping();
     const accepted = queueTextMessage(draft);
     if (accepted) setDraft('');
   };
@@ -202,14 +253,18 @@ export default function ConversationScreen() {
             color={theme.colors.primary}
           />
         </Pressable>
-        <Avatar name={name} uri={avatarUri} size={38} />
+        <Avatar name={name} uri={avatarUri} size={38} online={isDirectConversation && peerPresence.online} />
         <View style={styles.headerCopy}>
           <AppText variant="bodyStrong" numberOfLines={1}>{name}</AppText>
           <View style={styles.subtitleRow}>
             <View
               style={[
                 styles.statusDot,
-                { backgroundColor: realtimeState === 'connected' ? theme.colors.online : theme.colors.warning },
+                {
+                  backgroundColor: realtimeState !== 'connected'
+                    ? theme.colors.warning
+                    : (isDirectConversation && peerPresence.online ? theme.colors.online : theme.colors.textTertiary),
+                },
               ]}
             />
             <AppText variant="micro" tone="secondary">{headerSubtitle}</AppText>
@@ -268,7 +323,10 @@ export default function ConversationScreen() {
               <TextInput
                 multiline
                 value={draft}
-                onChangeText={setDraft}
+                onChangeText={(value) => {
+                  setDraft(value);
+                  updateTyping(value);
+                }}
                 maxLength={MAX_TEXT_MESSAGE_LENGTH}
                 placeholder="Message"
                 placeholderTextColor={theme.colors.textTertiary}

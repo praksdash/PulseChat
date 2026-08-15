@@ -29,3 +29,11 @@ Realtime is not durable application state. Messages and receipts are recovered f
 
 ## Future hardening
 Phase 21 will add rate limiting/abuse review, block/report enforcement, deletion semantics, media validation, dependency review and monitoring.
+
+## Phase 11 Realtime authorization
+
+- `presence:<user_uuid>` Presence INSERT is owner-only.
+- Presence SELECT is allowed only to the owner or authenticated users sharing a conversation with that user.
+- `typing:<conversation_uuid>` Broadcast SELECT/INSERT is limited to conversation members.
+- Typing uses a separate topic from database-originated `conversation:<uuid>` message/receipt events so clients cannot gain write access to trusted durable-message events.
+- `user_presence` is not directly queryable by authenticated mobile clients.

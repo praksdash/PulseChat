@@ -3,7 +3,7 @@
 Telegram-inspired messaging application built with React Native, Expo Router, TypeScript and Supabase.
 
 ## Current milestone
-Phase 10 — real delivery/read receipts and unread counters.
+Phase 11 — typing indicators, online/offline presence, and last seen.
 
 Implemented:
 - Android Expo development build
@@ -17,12 +17,12 @@ Implemented:
 - durable text messaging + optimistic retry
 - cursor-paginated history
 - private conversation-scoped Realtime Broadcast
-- private authenticated user inbox Broadcast
-- delivered/read receipt persistence
-- live sent/delivered/read ticks
-- per-conversation unread badges + Chats tab total
-- read cursor (`last_read_at`) updates
+- delivered/read receipt persistence + unread counters
+- app-level Realtime Presence for online/offline
+- durable last-seen heartbeat
+- private conversation-member typing Broadcast
+- typing debounce/expiry and background-safe presence handling
 
-Typing/presence begins in Phase 11.
+Media messages begin in Phase 12.
 
-See `PHASE10_README.txt` and `docs/PROJECT_STATE.md`.
+See `PHASE11_README.txt` and `docs/PROJECT_STATE.md`.

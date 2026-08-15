@@ -39,6 +39,24 @@ export type Database = {
         };
         Relationships: [];
       };
+      user_presence: {
+        Row: {
+          user_id: string;
+          last_seen_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          last_seen_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          last_seen_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       conversations: {
         Row: {
           id: string;
@@ -216,6 +234,14 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      touch_my_last_seen: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
+      get_user_last_seen: {
+        Args: { target_user_id: string };
+        Returns: string | null;
+      };
       is_username_available: {
         Args: { candidate: string };
         Returns: boolean;
@@ -316,6 +342,7 @@ export type Database = {
   };
 };
 
+export type UserPresence = Database['public']['Tables']['user_presence']['Row'];
 export type Conversation = Database['public']['Tables']['conversations']['Row'];
 export type ConversationMember = Database['public']['Tables']['conversation_members']['Row'];
 export type Message = Database['public']['Tables']['messages']['Row'];

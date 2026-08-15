@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 
 import { useAuth } from '@/hooks/use-auth';
 import { subscribeToUserInbox } from '@/services/inbox-realtime-service';
+import { subscribeToOwnPresence } from '@/services/presence-service';
 import { useAppTheme } from '@/theme';
 
 export default function AppLayout() {
@@ -12,6 +13,11 @@ export default function AppLayout() {
   useEffect(() => {
     if (!user?.id) return undefined;
     return subscribeToUserInbox(user.id);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    return subscribeToOwnPresence(user.id);
   }, [user?.id]);
 
   return (
