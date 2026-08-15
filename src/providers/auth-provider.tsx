@@ -160,22 +160,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const signOut = useCallback(async () => {
-    if (!isSupabaseConfigured) {
-      return missingConfigurationMessage;
-    }
+    if (!isSupabaseConfigured) return missingConfigurationMessage;
 
-    const { error } = await supabase.auth.signOut({
-      scope: 'local',
-    });
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    if (error) return getFriendlyAuthError(error);
 
-    if (error) {
-      return getFriendlyAuthError(error);
-    }
-
-    // Make UI update immediately.
     setSession(null);
     setProfile(null);
-
     return null;
   }, []);
 

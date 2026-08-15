@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from './app-text';
@@ -5,6 +6,7 @@ import { useAppTheme } from '@/theme';
 
 type AvatarProps = {
   name: string;
+  uri?: string | null;
   size?: number;
   online?: boolean;
   accent?: string;
@@ -19,7 +21,7 @@ function getInitials(name: string) {
     .join('');
 }
 
-export function Avatar({ name, size = 52, online = false, accent }: AvatarProps) {
+export function Avatar({ name, uri, size = 52, online = false, accent }: AvatarProps) {
   const theme = useAppTheme();
   const badgeSize = Math.max(12, Math.round(size * 0.26));
 
@@ -33,13 +35,23 @@ export function Avatar({ name, size = 52, online = false, accent }: AvatarProps)
             height: size,
             borderRadius: size / 2,
             backgroundColor: accent ?? theme.colors.primary,
+            overflow: 'hidden',
           },
         ]}>
-        <AppText
-          tone="inverse"
-          style={{ fontSize: Math.round(size * 0.34), fontWeight: '800' }}>
-          {getInitials(name)}
-        </AppText>
+        {uri ? (
+          <Image
+            source={{ uri }}
+            contentFit="cover"
+            transition={140}
+            style={{ width: size, height: size }}
+          />
+        ) : (
+          <AppText
+            tone="inverse"
+            style={{ fontSize: Math.round(size * 0.34), fontWeight: '800' }}>
+            {getInitials(name) || 'P'}
+          </AppText>
+        )}
       </View>
       {online ? (
         <View

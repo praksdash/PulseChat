@@ -1,16 +1,26 @@
 # PulseChat Security
 
-## Phase 4 controls
-- Mobile app uses only the Supabase Project URL and publishable key.
-- Never place `service_role`, secret keys, database passwords or signing secrets in Expo environment variables.
-- `.env` is ignored by Git.
-- Native auth session payload is encrypted before being placed in AsyncStorage; the encryption key is stored in Expo SecureStore.
-- Auth tokens refresh only while the native app is active.
-- Protected Expo Router groups keep signed-out users out of app screens.
-- PostgreSQL RLS remains the real authorization boundary.
-- `profiles` is RLS-enabled.
-- Users can read/update only their own profile in Phase 4.
-- Profile creation is server-side via a security-definer trigger.
+## Authentication
+Supabase Auth is the identity authority. Native auth sessions are persisted with an encrypted payload and the encryption key is kept in Expo SecureStore.
 
-## Important
-`EXPO_PUBLIC_*` values are bundled into the client. Only use values designed to be public, such as the Supabase publishable key. RLS must protect every user-owned table added in later phases.
+## Profile authorization
+- RLS remains enabled on `public.profiles`.
+- An authenticated user can SELECT and UPDATE only the row whose `id = auth.uid()`.
+- Direct client INSERT/DELETE remains revoked.
+- Username uniqueness is enforced by PostgreSQL, not only by client validation.
+- `is_username_available()` exposes only a boolean, not another user's profile data.
+
+## Avatar storage
+The avatar bucket is intentionally public-read because avatars are public profile identity data. Public read does **not** grant write access.
+
+Writes/deletes are protected by Storage RLS:
+- bucket must be `avatars`
+- first folder segment must equal the authenticated user's UUID
+
+`profiles.avatar_path` is additionally constrained to the profile owner's UUID folder, preventing one account from assigning another account's stored avatar path to itself.
+
+## Client keys
+Only the Supabase Project URL and publishable key belong in `EXPO_PUBLIC_*` variables. Never put a service-role/secret key in the app.
+
+## Later security work
+Phase 6+ adds conversation membership authorization. Phase 21 performs the dedicated production security review.

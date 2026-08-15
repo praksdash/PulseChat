@@ -61,7 +61,7 @@ export default function RegisterScreen() {
             </View>
             <AppText variant="title">Create your account</AppText>
             <AppText tone="secondary">
-              Start with email authentication. Username and avatar setup arrive in Phase 5.
+              Create your account now, then personalize your username, photo and bio from Profile.
             </AppText>
           </View>
 

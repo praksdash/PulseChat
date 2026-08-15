@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { router } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, AppText, Avatar, SettingsRow, SurfaceCard } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
+import { getAvatarPublicUrl } from '@/services/profile-service';
 import { useAppTheme } from '@/theme';
 
 export default function ProfileScreen() {
@@ -13,6 +15,7 @@ export default function ProfileScreen() {
   const [signOutError, setSignOutError] = useState<string | null>(null);
 
   const displayName = profile?.display_name || user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'PulseChat User';
+  const avatarUrl = useMemo(() => getAvatarPublicUrl(profile?.avatar_path), [profile?.avatar_path]);
 
   const handleSignOut = async () => {
     if (isSigningOut) return;
@@ -22,10 +25,7 @@ export default function ProfileScreen() {
 
     try {
       const error = await signOut();
-
-      if (error) {
-        setSignOutError(error);
-      }
+      if (error) setSignOutError(error);
     } catch (error) {
       console.error('Sign out failed:', error);
       setSignOutError('Unable to sign out. Please try again.');
@@ -39,23 +39,31 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <AppText variant="title">Profile</AppText>
-          <AppText variant="caption" tone="secondary">Authenticated account</AppText>
+          <AppText variant="caption" tone="secondary">Your PulseChat identity</AppText>
         </View>
 
         <SurfaceCard style={styles.profileCard}>
-          <Avatar name={displayName} size={88} online />
+          <Avatar name={displayName} uri={avatarUrl} size={88} online />
           <View style={styles.identity}>
             <AppText variant="heading">{displayName}</AppText>
-            <AppText tone="secondary">{user?.email ?? 'No email available'}</AppText>
-            <AppText variant="caption" tone="secondary" style={styles.bio}>
-              {isProfileLoading
-                ? 'Loading profile…'
-                : profile?.username
-                  ? `@${profile.username}`
-                  : 'Username and avatar setup arrive in Phase 5.'}
-            </AppText>
+            {profile?.username ? (
+              <AppText tone="secondary">@{profile.username}</AppText>
+            ) : (
+              <AppText tone="secondary">Add a username so people can find you later</AppText>
+            )}
+            {profile?.bio ? (
+              <AppText variant="caption" tone="secondary" style={styles.bio}>{profile.bio}</AppText>
+            ) : null}
+            {isProfileLoading ? <AppText variant="micro" tone="tertiary">Refreshing profile…</AppText> : null}
           </View>
         </SurfaceCard>
+
+        <AppButton
+          label="Edit profile"
+          variant="secondary"
+          icon={{ ios: 'pencil', android: 'edit', web: 'edit' }}
+          onPress={() => router.push('/profile/edit')}
+        />
 
         <View style={styles.section}>
           <AppText variant="captionStrong" tone="secondary" style={styles.sectionTitle}>ACCOUNT</AppText>
@@ -63,7 +71,13 @@ export default function ProfileScreen() {
             <SettingsRow
               icon={{ ios: 'person.fill', android: 'person', web: 'person' }}
               title="Account"
-              subtitle="Profile editing arrives in Phase 5"
+              subtitle="Edit name, username, photo and bio"
+              onPress={() => router.push('/profile/edit')}
+            />
+            <SettingsRow
+              icon={{ ios: 'envelope.fill', android: 'mail', web: 'mail' }}
+              title="Email"
+              subtitle={user?.email ?? 'No email available'}
             />
             <SettingsRow
               icon={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }}
@@ -106,7 +120,7 @@ const styles = StyleSheet.create({
   content: { padding: 18, paddingBottom: 30, gap: 20 },
   header: { gap: 2 },
   profileCard: { padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 },
-  identity: { flex: 1, gap: 2 },
+  identity: { flex: 1, gap: 3 },
   bio: { marginTop: 6 },
   section: { gap: 8 },
   sectionTitle: { paddingLeft: 4 },

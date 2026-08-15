@@ -134,7 +134,7 @@ export default function LoginScreen() {
           </SurfaceCard>
 
           <AppText variant="micro" tone="tertiary" style={styles.footer}>
-            Phase 4 • Supabase email authentication
+            PulseChat • Supabase authentication
           </AppText>
         </ScrollView>
       </KeyboardAvoidingView>

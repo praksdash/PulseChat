@@ -1,31 +1,38 @@
 # PulseChat Testing
 
-## Phase 4 manual test matrix
+## Phase 5 manual tests
 
 ### Happy path
-1. Create a new account.
-2. If email confirmation is disabled, app enters Chats automatically.
-3. Open Profile and confirm display name + email are correct.
-4. Close the app fully and reopen it; session should restore.
-5. Sign out; app should return to Login.
-6. Sign back in successfully.
+1. Log in.
+2. Profile → Edit profile.
+3. Update display name, username and bio.
+4. Select/crop an avatar.
+5. Save.
+6. Confirm Profile immediately shows all changes.
+7. Kill/reopen app and confirm changes persist.
 
-### Email confirmation path
-With Confirm Email enabled, signup should show a confirmation instruction instead of entering the app without a session.
+### Username validation
+- `<3` characters rejected.
+- `>32` characters rejected.
+- spaces/symbols rejected.
+- uppercase input normalizes to lowercase.
+- blank username is allowed.
+- a username already owned by another account is rejected by both availability check and DB uniqueness.
 
-### Validation
-- Invalid email is blocked locally.
-- Empty password is blocked locally.
-- Registration password shorter than 8 characters is blocked locally.
-- Password mismatch is blocked locally.
+### Avatar security/behavior
+- denied photo permission produces a user-facing message.
+- selected image is compressed before upload.
+- avatar appears after save and survives restart.
+- replacing avatar removes the previous object after successful profile update.
+- remove avatar returns to initials.
+- user cannot upload/delete under another user's UUID folder.
 
 ### Failure path
-- Wrong password shows a friendly error.
-- Offline/network failure shows a network-oriented error.
-- Missing `.env` renders a configuration warning and disables auth submission.
+- network failure while checking username shows a non-destructive availability message.
+- network/storage failure during save keeps the edit screen open and shows an error.
+- if DB update fails after a new avatar upload, the newly uploaded object is cleaned up.
 
-### Permission / RLS test
-Create two users. In Supabase SQL/REST testing as each authenticated user, confirm user A cannot select/update user B's `profiles` row.
-
-### Persistence test
-Sign in -> terminate app -> relaunch -> Chats should appear without another login.
+### Regression
+- signup/login/session persistence still work.
+- Sign out returns directly to Login.
+- Chats/Search/Profile navigation still works.

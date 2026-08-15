@@ -14,6 +14,7 @@ export default function AppLayout() {
       }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="chat/[conversationId]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="profile/edit" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
 }

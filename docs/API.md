@@ -1,16 +1,21 @@
-# PulseChat API / Data Access
+# PulseChat API Surface
 
-## Phase 4
-The client accesses Supabase directly through `@supabase/supabase-js` using the publishable key and the signed-in user's JWT.
+The mobile app currently talks directly to Supabase through `@supabase/supabase-js` under RLS.
 
-### Auth operations
-- `supabase.auth.signUp`
-- `supabase.auth.signInWithPassword`
-- `supabase.auth.getSession`
-- `supabase.auth.onAuthStateChange`
-- `supabase.auth.signOut`
+## Auth
+- `auth.signUp()`
+- `auth.signInWithPassword()`
+- `auth.signOut({ scope: 'local' })`
+- persisted session restore and token auto-refresh
 
-### Profile operation
-- SELECT own row from `public.profiles`
+## Profiles
+- own profile SELECT
+- own profile UPDATE
+- `rpc('is_username_available', { candidate })`
 
-There is no custom REST API or Edge Function in Phase 4.
+## Storage
+- `avatars.upload()` into `<auth.uid()>/...`
+- `avatars.remove()` for own objects
+- `avatars.getPublicUrl()` for profile display
+
+No service-role operations are performed by the client.
