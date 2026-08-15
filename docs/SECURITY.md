@@ -48,3 +48,13 @@ Phase 21 will add rate limiting/abuse review, block/report enforcement, deletion
 - Direct client inserts into `public.messages` are now RLS-restricted to `message_type = 'text'`; image messages must use the media RPC.
 - Signed URLs are short-lived delivery artifacts and are not persisted in database rows.
 - No service-role/secret key is present in the mobile client.
+
+## Phase 13 message action security
+
+- Clients have no direct UPDATE/DELETE privilege on `messages`; edits/deletes use narrow security-definer RPCs.
+- RPCs derive the actor from `auth.uid()` and verify sender ownership + conversation membership.
+- Reaction writes are RPC-only. `message_reactions` direct access is SELECT-only and RLS-filtered.
+- Deleted message bodies are redacted from history projections.
+- Deleted image attachment metadata is removed.
+- `chat-media` reads now require a live attachment linked to a non-deleted message; folder membership alone is no longer enough for reads.
+- Mutation broadcasts stay on private conversation/user topics governed by existing Realtime Authorization policies.

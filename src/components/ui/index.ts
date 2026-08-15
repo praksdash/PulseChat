@@ -13,3 +13,8 @@ export * from './user-row';
 export * from './attachment-picker-modal';
 export * from './media-message-bubble';
 export * from './media-viewer';
+export * from './message-reaction-bar';
+export * from './message-reply-preview';
+export * from './message-actions-modal';
+
+export * from './confirm-action-modal';

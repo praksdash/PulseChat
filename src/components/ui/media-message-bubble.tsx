@@ -3,8 +3,15 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppIcon } from './app-icon';
 import { AppText } from './app-text';
+import { MessageReactionBar } from './message-reaction-bar';
+import { MessageReplyPreview } from './message-reply-preview';
 import { useAppTheme } from '@/theme';
-import type { MediaSendStage, MessageLocalState } from '@/types/message';
+import type {
+  MediaSendStage,
+  MessageLocalState,
+  MessageReactionSummary,
+  SupportedReaction,
+} from '@/types/message';
 
 type MediaMessageBubbleProps = {
   uri?: string | null;
@@ -15,18 +22,22 @@ type MediaMessageBubbleProps = {
   outgoing?: boolean;
   status?: MessageLocalState;
   mediaStage?: MediaSendStage;
+  edited?: boolean;
+  replySenderLabel?: string | null;
+  replyText?: string | null;
+  reactions?: MessageReactionSummary[];
+  myReaction?: SupportedReaction | null;
+  onReactionPress?: (emoji: SupportedReaction) => void;
   onOpen?: () => void;
   onRetry?: () => void;
+  onLongPress?: () => void;
 };
 
 function getPreviewSize(width?: number | null, height?: number | null) {
   const ratio = width && height ? width / height : 4 / 3;
   const clampedRatio = Math.min(1.6, Math.max(0.68, ratio));
   const previewWidth = 250;
-  return {
-    width: previewWidth,
-    height: Math.round(previewWidth / clampedRatio),
-  };
+  return { width: previewWidth, height: Math.round(previewWidth / clampedRatio) };
 }
 
 export function MediaMessageBubble({
@@ -38,8 +49,15 @@ export function MediaMessageBubble({
   outgoing = false,
   status,
   mediaStage,
+  edited = false,
+  replySenderLabel,
+  replyText,
+  reactions,
+  myReaction,
+  onReactionPress,
   onOpen,
   onRetry,
+  onLongPress,
 }: MediaMessageBubbleProps) {
   const theme = useAppTheme();
   const preview = getPreviewSize(width, height);
@@ -54,11 +72,7 @@ export function MediaMessageBubble({
 
   const statusContent = () => {
     if (!outgoing || !status) return null;
-
-    if (status === 'sending') {
-      return <AppText variant="micro" tone="tertiary">Sending…</AppText>;
-    }
-
+    if (status === 'sending') return <AppText variant="micro" tone="tertiary">Sending…</AppText>;
     if (status === 'failed') {
       return (
         <Pressable
@@ -86,90 +100,90 @@ export function MediaMessageBubble({
   };
 
   return (
-    <View
-      style={[
-        styles.bubble,
-        outgoing ? styles.outgoing : styles.incoming,
-        {
-          backgroundColor: outgoing ? theme.colors.outgoingBubble : theme.colors.incomingBubble,
-          borderColor: status === 'failed' ? theme.colors.danger : theme.colors.border,
-        },
-      ]}>
+    <View style={[styles.wrapper, outgoing ? styles.outgoing : styles.incoming]}>
       <Pressable
-        accessibilityRole={uri ? 'button' : undefined}
-        accessibilityLabel={uri ? 'Open photo' : 'Photo preview unavailable'}
-        disabled={!uri || !onOpen}
-        onPress={onOpen}
-        style={[styles.imageShell, preview, { backgroundColor: theme.colors.surfaceMuted }]}>
-        {uri ? (
-          <Image
-            source={{ uri }}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            transition={120}
-            cachePolicy="memory-disk"
-          />
-        ) : (
-          <View style={styles.placeholder}>
-            <AppIcon
-              name={{ ios: 'photo', android: 'image', web: 'image' }}
-              size={34}
-              color={theme.colors.textTertiary}
-            />
-            <AppText variant="caption" tone="tertiary">Photo</AppText>
-          </View>
-        )}
-
-        {stageLabel ? (
-          <View style={styles.progressOverlay}>
-            <ActivityIndicator size="small" color="#FFFFFF" />
-            <AppText variant="micro" style={styles.progressText}>{stageLabel}</AppText>
-          </View>
+        delayLongPress={350}
+        onLongPress={onLongPress}
+        style={({ pressed }) => [
+          styles.bubble,
+          outgoing ? styles.outgoingBubble : styles.incomingBubble,
+          {
+            backgroundColor: outgoing ? theme.colors.outgoingBubble : theme.colors.incomingBubble,
+            borderColor: status === 'failed' ? theme.colors.danger : theme.colors.border,
+            opacity: pressed && onLongPress ? 0.86 : 1,
+          },
+        ]}>
+        {replySenderLabel && replyText ? (
+          <MessageReplyPreview senderLabel={replySenderLabel} text={replyText} />
         ) : null}
+
+        <Pressable
+          accessibilityRole={uri ? 'button' : undefined}
+          accessibilityLabel={uri ? 'Open photo' : 'Photo preview unavailable'}
+          disabled={!uri || !onOpen}
+          onPress={onOpen}
+          style={[styles.imageShell, preview, { backgroundColor: theme.colors.surfaceMuted }]}> 
+          {uri ? (
+            <Image
+              source={{ uri }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              transition={120}
+              cachePolicy="memory-disk"
+            />
+          ) : (
+            <View style={styles.placeholder}>
+              <AppIcon name={{ ios: 'photo', android: 'image', web: 'image' }} size={34} color={theme.colors.textTertiary} />
+              <AppText variant="caption" tone="tertiary">Photo</AppText>
+            </View>
+          )}
+
+          {stageLabel ? (
+            <View style={styles.progressOverlay}>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <AppText variant="micro" style={styles.progressText}>{stageLabel}</AppText>
+            </View>
+          ) : null}
+        </Pressable>
+
+        {caption ? <AppText style={styles.caption}>{caption}</AppText> : null}
+
+        <View style={styles.meta}>
+          {edited ? <AppText variant="micro" tone="tertiary">edited</AppText> : null}
+          <AppText variant="micro" tone="tertiary">{time}</AppText>
+          {statusContent()}
+        </View>
       </Pressable>
-
-      {caption ? <AppText style={styles.caption}>{caption}</AppText> : null}
-
-      <View style={styles.meta}>
-        <AppText variant="micro" tone="tertiary">{time}</AppText>
-        {statusContent()}
-      </View>
+      <MessageReactionBar reactions={reactions} myReaction={myReaction} onPress={onReactionPress} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: { maxWidth: '86%', gap: 2 },
+  incoming: { alignSelf: 'flex-start', alignItems: 'flex-start' },
+  outgoing: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   bubble: {
-    maxWidth: '86%',
+    maxWidth: '100%',
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     padding: 4,
     gap: 5,
   },
-  incoming: { alignSelf: 'flex-start', borderBottomLeftRadius: 6 },
-  outgoing: { alignSelf: 'flex-end', borderBottomRightRadius: 6 },
+  incomingBubble: { borderBottomLeftRadius: 6 },
+  outgoingBubble: { borderBottomRightRadius: 6 },
   imageShell: { overflow: 'hidden', borderRadius: 14 },
   placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 7 },
   progressOverlay: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
+    position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
     backgroundColor: 'rgba(9, 18, 28, 0.52)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
+    alignItems: 'center', justifyContent: 'center', gap: 7,
   },
   progressText: { color: '#FFFFFF' },
   caption: { paddingHorizontal: 8, paddingTop: 2, lineHeight: 20 },
   meta: {
     minHeight: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 4,
-    paddingHorizontal: 7,
-    paddingBottom: 2,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4,
+    paddingHorizontal: 7, paddingBottom: 2,
   },
 });

@@ -177,6 +177,7 @@ export async function sendImageMessage(input: {
   clientMessageId: string;
   asset: PendingImageAsset;
   caption?: string | null;
+  replyToMessageId?: string | null;
   onStage?: (stage: Exclude<MediaSendStage, 'ready' | 'failed'>) => void;
 }): Promise<MessagePageRow> {
   input.onStage?.('preparing');
@@ -209,6 +210,7 @@ export async function sendImageMessage(input: {
     target_width: prepared.width,
     target_height: prepared.height,
     target_caption: input.caption?.trim() || null,
+    target_reply_to_message_id: input.replyToMessageId ?? null,
   });
 
   if (error) throw new Error(error.message);

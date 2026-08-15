@@ -80,6 +80,16 @@ export function subscribeToUserInbox(userId: string) {
             deliveryTimers.set(inboxMessage.conversationId, timer);
           }
         })
+        .on('broadcast', { event: 'inbox_message_changed' }, (event: unknown) => {
+          const payload = extractPayload(event);
+          const conversationId = payload?.conversation_id;
+          if (typeof conversationId !== 'string' || disposed) return;
+
+          emitConversationActivity({
+            type: 'message',
+            conversationId,
+          });
+        })
         .subscribe((status: string, error?: Error) => {
           if (disposed) return;
 

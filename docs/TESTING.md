@@ -75,3 +75,20 @@ Typing/presence is Phase 11; media is Phase 12.
 9. Repeated/retried send must reuse the same `client_message_id` and canonical object path.
 10. Account C, not in the conversation, must be unable to read the private object or sign it through the Storage API.
 11. Verify text, receipts, typing and presence still work after the Phase 12 migration.
+
+## Phase 13 manual tests
+
+1. A long-presses B's text → Reply → sends text; both devices show reply preview.
+2. A replies to B's photo with a text; restart and verify reply remains.
+3. A replies to B's text with a photo; receiver gets it realtime.
+4. A edits own text; B sees updated text without refresh and `edited` appears.
+5. A cannot edit B's message.
+6. A edits own photo caption, including removing caption.
+7. A deletes own text; both sides show `Message deleted`.
+8. A deletes own image; image becomes unavailable and message shows deleted.
+9. B cannot delete A's message via normal client UI/API RPC.
+10. A and B react with different emojis; counts aggregate realtime.
+11. Tapping the same reaction again removes the user's reaction.
+12. Changing reaction replaces the prior reaction for that user.
+13. Close/reopen app; edits/deletes/reactions/replies persist.
+14. Edit/delete the latest message while peer is on Chats tab; preview refreshes.

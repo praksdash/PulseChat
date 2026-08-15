@@ -67,3 +67,21 @@ Members may read objects for their conversations. Upload/delete requires the obj
 
 ### Realtime event `media_message_ready`
 Private `conversation:<uuid>` Broadcast sent after image attachment metadata commits. Clients reconcile message history so the ordinary message INSERT event cannot race attachment creation.
+
+## Phase 13 RPCs
+
+### edit_message
+Inputs: `target_message_id`, `target_body`.
+Sender-only edit of text/image caption.
+
+### delete_message
+Input: `target_message_id`.
+Returns message/conversation plus optional media storage path for uploader cleanup.
+
+### set_message_reaction
+Inputs: `target_message_id`, optional `target_emoji`.
+Null removes the caller's reaction.
+
+### get_message_detail
+Input: `target_message_id`.
+Returns the authorized Phase 13 message projection used after mutation Broadcast events.

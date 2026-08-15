@@ -84,3 +84,26 @@ Direct table access is revoked from mobile roles. The app uses `touch_my_last_se
 The durable database stores only the private object path, never a permanent public URL. `list_conversation_messages` projects the attachment fields alongside each message; the client then requests a temporary signed URL through Storage RLS.
 
 Image DB creation is performed by `create_image_message`, which uses the existing `(sender_id, client_message_id)` uniqueness guarantee for idempotent retry.
+
+## Phase 13 message actions
+
+### message_reactions
+
+One active reaction per user per message:
+- `message_id` → messages
+- `user_id` → auth.users
+- `emoji`
+- `created_at`
+- `updated_at`
+
+Primary key: `(message_id, user_id)`.
+Allowed MVP reactions: 👍 ❤️ 😂 😮 😢 🙏.
+
+### Message mutation RPCs
+
+- `edit_message(message_id, body)` — derives actor from `auth.uid()` and permits only the sender.
+- `delete_message(message_id)` — sender-only soft delete, clears content and attachment metadata.
+- `set_message_reaction(message_id, emoji)` — current-user reaction set/remove.
+- `get_message_detail(message_id)` — one-row authorized projection for realtime reconciliation.
+
+`list_conversation_messages` now returns reply preview and aggregate reaction state with each row.

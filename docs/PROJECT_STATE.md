@@ -86,3 +86,29 @@ After verification:
 
 ## Next task
 Phase 13 — reply/edit/delete/reactions.
+
+## Phase 13 — Reply / Edit / Delete / Reactions
+
+Status: implemented in source package; requires migration + device verification.
+
+Added:
+- Reply to persisted text/image messages.
+- Reply preview projected in paginated message history.
+- Sender-only edit RPC for text and image captions.
+- Sender-only soft delete for everyone.
+- Deleted-content redaction and deleted-media Storage-read hardening.
+- `message_reactions` with one reaction per user/message.
+- Realtime edit/delete/reaction reconciliation.
+- Chats-list refresh when latest message is edited/deleted.
+
+Migration:
+- `supabase/migrations/202608150011_phase13_message_actions.sql`
+
+Verification:
+- `supabase/phase13_verify.sql`
+
+Next planned phase: Phase 14 — Group chats.
+
+## Phase 13 delete hotfix
+- Replaced unsupported React Native Web Alert confirmation with a cross-platform PulseChat confirmation modal.
+- Delete now applies an immediate local tombstone after the server RPC succeeds and then reconciles from PostgreSQL/Realtime.

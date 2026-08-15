@@ -186,6 +186,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      message_reactions: {
+        Row: {
+          message_id: string;
+          user_id: string;
+          emoji: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          message_id: string;
+          user_id: string;
+          emoji: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          message_id?: string;
+          user_id?: string;
+          emoji?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       attachments: {
         Row: {
           id: string;
@@ -327,6 +351,43 @@ export type Database = {
           attachment_width: number | null;
           attachment_height: number | null;
           attachment_duration_ms: number | null;
+          reply_sender_id: string | null;
+          reply_message_type: 'text' | 'image' | 'video' | 'audio' | 'voice' | 'file' | 'system' | null;
+          reply_body: string | null;
+          reply_deleted_at: string | null;
+          reaction_counts: Json;
+          my_reaction: string | null;
+        }>;
+      };
+      get_message_detail: {
+        Args: { target_message_id: string };
+        Returns: Array<{
+          id: string;
+          conversation_id: string;
+          sender_id: string | null;
+          client_message_id: string;
+          message_type: 'text' | 'image' | 'video' | 'audio' | 'voice' | 'file' | 'system';
+          body: string | null;
+          reply_to_message_id: string | null;
+          created_at: string;
+          edited_at: string | null;
+          deleted_at: string | null;
+          delivery_status: 'sent' | 'delivered' | 'read' | null;
+          attachment_id: string | null;
+          attachment_storage_bucket: string | null;
+          attachment_storage_path: string | null;
+          attachment_mime_type: string | null;
+          attachment_file_name: string | null;
+          attachment_file_size: number | null;
+          attachment_width: number | null;
+          attachment_height: number | null;
+          attachment_duration_ms: number | null;
+          reply_sender_id: string | null;
+          reply_message_type: 'text' | 'image' | 'video' | 'audio' | 'voice' | 'file' | 'system' | null;
+          reply_body: string | null;
+          reply_deleted_at: string | null;
+          reaction_counts: Json;
+          my_reaction: string | null;
         }>;
       };
       create_image_message: {
@@ -339,6 +400,7 @@ export type Database = {
           target_width?: number | null;
           target_height?: number | null;
           target_caption?: string | null;
+          target_reply_to_message_id?: string | null;
         };
         Returns: Array<{
           id: string;
@@ -361,7 +423,30 @@ export type Database = {
           attachment_width: number | null;
           attachment_height: number | null;
           attachment_duration_ms: number | null;
+          reply_sender_id: string | null;
+          reply_message_type: 'text' | 'image' | 'video' | 'audio' | 'voice' | 'file' | 'system' | null;
+          reply_body: string | null;
+          reply_deleted_at: string | null;
+          reaction_counts: Json;
+          my_reaction: string | null;
         }>;
+      };
+      edit_message: {
+        Args: { target_message_id: string; target_body: string };
+        Returns: undefined;
+      };
+      delete_message: {
+        Args: { target_message_id: string };
+        Returns: Array<{
+          message_id: string;
+          conversation_id: string;
+          storage_bucket: string | null;
+          storage_path: string | null;
+        }>;
+      };
+      set_message_reaction: {
+        Args: { target_message_id: string; target_emoji?: string | null };
+        Returns: string | null;
       };
       get_my_total_unread_count: {
         Args: Record<string, never>;
@@ -390,4 +475,5 @@ export type Conversation = Database['public']['Tables']['conversations']['Row'];
 export type ConversationMember = Database['public']['Tables']['conversation_members']['Row'];
 export type Message = Database['public']['Tables']['messages']['Row'];
 export type MessageReceipt = Database['public']['Tables']['message_receipts']['Row'];
+export type MessageReaction = Database['public']['Tables']['message_reactions']['Row'];
 export type Attachment = Database['public']['Tables']['attachments']['Row'];

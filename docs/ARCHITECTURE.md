@@ -110,3 +110,27 @@ image bubble / full-screen viewer
 ```
 
 The Storage bucket is private. PostgreSQL remains the source of truth for message/attachment metadata; Storage owns the binary object; Realtime only accelerates reconciliation.
+
+## Phase 13 message mutation flow
+
+```text
+Long-press message
+      ↓
+Reply / Edit / Delete / React
+      ↓
+PostgreSQL validates auth.uid(), ownership and membership
+      ↓
+Durable mutation
+      ↓
+private conversation:<uuid> Broadcast
+      ↓
+peer fetches get_message_detail(message_id)
+      ↓
+visible bubble reconciles without full-history reload
+```
+
+Edit/delete also fan out a minimal `inbox_message_changed` event to private `user:<uuid>` topics so the Chats preview refreshes when the latest message changes.
+
+Replies use the existing `(reply_to_message_id, conversation_id)` foreign key, guaranteeing that a reply cannot target another conversation.
+
+Deleted image messages remove attachment metadata and are no longer eligible for new Storage signed URLs. Physical object deletion is then attempted by the sender client under uploader-only Storage RLS.

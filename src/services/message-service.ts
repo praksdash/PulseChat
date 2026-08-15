@@ -35,11 +35,22 @@ export async function listConversationMessages(
   return hydrateMessageMediaUrls((data ?? []) as MessagePageRow[]);
 }
 
+export async function getMessageDetail(messageId: string): Promise<MessagePageRow | null> {
+  const { data, error } = await supabase.rpc('get_message_detail', {
+    target_message_id: messageId,
+  });
+
+  if (error) throw new Error(error.message);
+  const rows = await hydrateMessageMediaUrls((data ?? []) as MessagePageRow[]);
+  return rows[0] ?? null;
+}
+
 export async function sendTextMessage(input: {
   conversationId: string;
   senderId: string;
   clientMessageId: string;
   body: string;
+  replyToMessageId?: string | null;
 }): Promise<Message> {
   const body = input.body.trim();
 
@@ -57,7 +68,7 @@ export async function sendTextMessage(input: {
     client_message_id: input.clientMessageId,
     message_type: 'text' as const,
     body,
-    reply_to_message_id: null,
+    reply_to_message_id: input.replyToMessageId ?? null,
   };
 
   const { data, error } = await supabase
@@ -95,6 +106,7 @@ type SubscribeOptions = {
   onMessage: (message: Message) => void;
   onReceiptState?: (event: ReceiptCursorEvent) => void;
   onMediaReady?: (messageId: string | null) => void;
+  onMessageChanged?: (messageId: string, changeType: 'updated' | 'deleted' | 'reactions') => void;
   onStateChange?: (state: RealtimeState) => void;
   onError?: (error: unknown) => void;
 };
@@ -167,11 +179,21 @@ function extractReceiptCursor(
   };
 }
 
+function extractChangedMessageId(event: unknown): string | null {
+  if (!event || typeof event !== 'object') return null;
+  const root = event as Record<string, unknown>;
+  const payload = root.payload;
+  if (!payload || typeof payload !== 'object') return null;
+  const messageId = (payload as Record<string, unknown>).message_id;
+  return typeof messageId === 'string' ? messageId : null;
+}
+
 export function subscribeToConversationMessages({
   conversationId,
   onMessage,
   onReceiptState,
   onMediaReady,
+  onMessageChanged,
   onStateChange,
   onError,
 }: SubscribeOptions) {
@@ -217,6 +239,18 @@ export function subscribeToConversationMessages({
           }
           const messageId = (payload as Record<string, unknown>).message_id;
           onMediaReady?.(typeof messageId === 'string' ? messageId : null);
+        })
+        .on('broadcast', { event: 'message_updated' }, (event: unknown) => {
+          const messageId = extractChangedMessageId(event);
+          if (messageId) onMessageChanged?.(messageId, 'updated');
+        })
+        .on('broadcast', { event: 'message_deleted' }, (event: unknown) => {
+          const messageId = extractChangedMessageId(event);
+          if (messageId) onMessageChanged?.(messageId, 'deleted');
+        })
+        .on('broadcast', { event: 'message_reactions_changed' }, (event: unknown) => {
+          const messageId = extractChangedMessageId(event);
+          if (messageId) onMessageChanged?.(messageId, 'reactions');
         })
         .subscribe((status: string, error?: Error) => {
           if (disposed) return;
