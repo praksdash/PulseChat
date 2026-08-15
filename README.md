@@ -3,7 +3,7 @@
 Telegram-inspired messaging application built with React Native, Expo Router, TypeScript and Supabase.
 
 ## Current milestone
-Phase 7 — secure real-user discovery.
+Phase 8 — real direct-chat creation and database-backed Chats list.
 
 Implemented so far:
 - Android Expo development build
@@ -14,11 +14,14 @@ Implemented so far:
 - avatar Storage RLS
 - production conversation/member/message/receipt/attachment schema
 - membership-based messaging RLS and dedupe/pagination primitives
-- real authenticated user search by display name/username
-- private discovery RPCs that expose only safe public profile fields
-- public profile details route
-- search debounce, loading/error/empty states and stale-request protection
+- real authenticated user discovery
+- safe public profile details
+- transactional create-or-get direct conversation RPC
+- one direct conversation per canonical user pair
+- real Supabase-backed Chats list
+- membership-protected conversation summary route
+- chat-list loading/error/empty/pull-to-refresh states
 
-The chat list remains mock data intentionally. Phase 8 creates real direct conversations and replaces the mock chat list; Phase 9 adds realtime text messaging.
+Text message sending and realtime delivery remain intentionally deferred to Phase 9.
 
-See `PHASE7_README.txt` and `docs/PROJECT_STATE.md`.
+See `PHASE8_README.txt` and `docs/PROJECT_STATE.md`.

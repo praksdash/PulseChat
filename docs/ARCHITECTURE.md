@@ -9,98 +9,93 @@ Expo / React Native / TypeScript
         ├── AuthProvider
         ├── reusable UI/theme
         ├── profile + discovery services
+        ├── conversation service
         └── typed Supabase client
                  │
                  ├── Supabase Auth
                  ├── PostgreSQL + RLS
                  │      ├── self-only profile table access
                  │      ├── controlled discovery RPCs
-                 │      └── messaging schema/RLS
+                 │      ├── messaging schema/RLS
+                 │      └── Phase 8 conversation RPCs
                  └── Supabase Storage (avatars)
 ```
 
-## Phase 7 discovery architecture
+## Phase 8 direct-chat flow
 
 ```text
-Search input
-    │
-    ├── minimum 2 characters
-    └── 350 ms debounce
-            │
-            ▼
-user-discovery-service
-            │
-            ▼
-public.search_profiles RPC
-            │
-            ├── authenticated only
-            ├── max 20 results
-            ├── excludes auth.uid()
-            ├── searches name/username
-            └── returns safe fields only
-                    │
-                    ▼
-               Search results
-                    │
-                    ▼
-             /users/[userId]
-                    │
-                    ▼
-public.get_public_profile RPC
+Discovered user profile
+        │
+        ▼
+Start chat
+        │
+        ▼
+conversation-service
+        │
+        ▼
+public.create_or_get_direct_conversation(target_user_id)
+        │
+        ├── require auth.uid()
+        ├── reject self-chat
+        ├── validate target profile
+        ├── compute canonical direct_key
+        ├── INSERT conversation ON CONFLICT DO NOTHING
+        ├── create exactly two member rows if new
+        └── return conversation UUID
+                │
+                ▼
+       /chat/[conversationId]
 ```
 
-The app does not broaden `public.profiles` RLS for discovery. A client that directly queries the table still sees only its own row. Narrow `SECURITY DEFINER` RPCs provide the public discovery projection without exposing email or auth metadata.
+The partial unique index on `conversations.direct_key` is the database-level race-condition boundary. Two clients can request the same pair concurrently, but only one direct-conversation row can commit.
 
-## Phase 6 messaging architecture
+## Real Chats list
 
 ```text
-Mobile client
-    │
-    │ publishable key + authenticated JWT
-    ▼
-Supabase Data API
-    │
-    ├── PostgreSQL grants
-    └── Row Level Security
-            │
-            ▼
-    conversation_members
-            │
-      authorization root
-       /      |       \
-      ▼       ▼        ▼
-conversations messages receipts
-                    │
-                    ▼
-                attachments
+Chats tab focus / pull refresh
+        │
+        ▼
+listMyConversations()
+        │
+        ▼
+public.list_my_conversations()
+        │
+        ├── filters by auth.uid() membership
+        ├── joins only safe peer profile fields
+        ├── returns latest message preview metadata
+        └── orders by conversation activity
+                │
+                ▼
+              ChatRow
 ```
 
-`conversation_members` remains the authorization root for messaging. Membership checks live in non-exposed PulseChat-private database helpers to avoid recursive RLS policies.
+`public.profiles` remains self-only through normal table RLS. The security-definer conversation RPC exposes only the peer fields the chat UI needs.
 
-## Message lifecycle prepared by Phase 6
+## Conversation route protection
+`get_conversation_summary` returns a row only when the caller has a `conversation_members` row for the target UUID. Knowing a conversation UUID is not sufficient to retrieve its header context.
+
+## Message lifecycle prepared for Phase 9
 
 ```text
 client creates client_message_id
         ↓
-INSERT messages
+optimistic message
         ↓
-RLS checks sender + membership
+INSERT public.messages
         ↓
-PostgreSQL uniqueness deduplicates retries
+RLS sender/member check
         ↓
-server created_at establishes durable ordering
+unique(sender_id, client_message_id) dedupe
         ↓
-trigger advances conversation.last_message_at
+server created_at ordering
         ↓
-Phase 9 will Broadcast the committed event
+conversation.last_message_at trigger
+        ↓
+Realtime Broadcast after commit (Phase 9)
 ```
 
-## Type safety
-`src/types/database.ts` includes typed profile-discovery RPCs and Phase 6 table shapes. `src/lib/supabase.ts` creates the typed Supabase client used by profile, discovery and future chat services.
-
 ## Deferred responsibilities
-- Phase 8: transactional direct-chat creation + real chat list
-- Phase 9: text messaging + Realtime Broadcast
+- Phase 9: text messaging + Realtime Broadcast + pagination
 - Phase 10: delivery/read UI and service
 - Phase 11: typing/presence
 - Phase 12: media storage

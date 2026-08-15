@@ -54,7 +54,7 @@ One row per direct or group conversation.
 - `updated_at`
 - `last_message_at` — cached activity timestamp for fast chat-list ordering
 
-A partial unique index on `direct_key` prevents duplicate direct conversations for the same canonical pair. Phase 8 will be the only normal app path that creates direct conversations and memberships.
+A partial unique index on `direct_key` prevents duplicate direct conversations for the same canonical pair. Phase 8 adds the only normal app path that creates direct conversations and memberships: `public.create_or_get_direct_conversation(target_user_id)`.
 
 ## `public.conversation_members`
 Normalized many-to-many membership table.
@@ -129,22 +129,27 @@ The `chat-media` Storage bucket and attachment-write privileges are intentionall
 A successful message INSERT advances `conversations.last_message_at`. This keeps chat-list ordering cheap without duplicating message text into the conversation row.
 
 ## Direct-conversation lifecycle
-Phase 6 creates the uniqueness primitive (`direct_key`) but does not expose conversation creation to the client.
+Phase 8 now exposes a narrow authenticated database function, `public.create_or_get_direct_conversation(target_user_id)`, that:
 
-Phase 8 will add a narrow transactional database function that:
+1. requires `auth.uid()`,
+2. rejects self-chat and invalid targets,
+3. computes the canonical pair key on the server,
+4. inserts the direct conversation with `ON CONFLICT DO NOTHING`,
+5. lets the partial unique `direct_key` index serialize competing creators,
+6. creates exactly two `member` rows only for a newly created chat,
+7. returns the same conversation UUID for repeated calls.
 
-1. validates the target user,
-2. computes the canonical pair key,
-3. returns an existing direct conversation if present,
-4. otherwise creates one conversation,
-5. creates exactly two member rows,
-6. returns the conversation id.
+Clients still have no direct INSERT privilege on `conversations` or `conversation_members`.
 
-That avoids a race where two devices create duplicate direct chats.
+### Phase 8 chat-list projection
+`public.list_my_conversations(result_limit)` returns only conversations where the caller has a membership row. It joins safe peer profile fields and latest-message preview metadata without broadening `profiles` table RLS.
+
+### Phase 8 conversation summary
+`public.get_conversation_summary(target_conversation_id)` returns chat header context only when the caller belongs to that conversation.
 
 ## Future migrations
 - Phase 7: controlled user discovery ✅
-- Phase 8: direct-chat creation RPC and real chat list
+- Phase 8: direct-chat creation RPC and real chat list ✅
 - Phase 9: text-message service + Realtime Broadcast
 - Phase 10: delivery/read service
 - Phase 12: `chat-media` Storage + attachment writes

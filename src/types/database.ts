@@ -240,6 +240,38 @@ export type Database = {
           bio: string | null;
         }>;
       };
+      create_or_get_direct_conversation: {
+        Args: { target_user_id: string };
+        Returns: string;
+      };
+      list_my_conversations: {
+        Args: { result_limit?: number };
+        Returns: Array<{
+          conversation_id: string;
+          kind: 'direct' | 'group';
+          display_name: string;
+          username: string | null;
+          avatar_path: string | null;
+          peer_user_id: string | null;
+          last_message_preview: string | null;
+          last_message_sender_id: string | null;
+          last_message_created_at: string | null;
+          last_activity_at: string;
+        }>;
+      };
+      get_conversation_summary: {
+        Args: { target_conversation_id: string };
+        Returns: Array<{
+          conversation_id: string;
+          kind: 'direct' | 'group';
+          display_name: string;
+          username: string | null;
+          avatar_path: string | null;
+          peer_user_id: string | null;
+          created_at: string;
+          last_activity_at: string;
+        }>;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

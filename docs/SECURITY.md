@@ -1,49 +1,40 @@
 # PulseChat Security
 
 ## Authentication
-Supabase Auth remains the identity authority. Native auth sessions are persisted with an encrypted payload and the encryption key is kept in Expo SecureStore.
+Supabase Auth is the identity authority. Native auth sessions are persisted with encrypted storage and protected Expo SecureStore key material.
 
 ## Client keys
-Only the Supabase Project URL and publishable key belong in `EXPO_PUBLIC_*` variables. Never put a service-role/secret key in the mobile app.
+Only the Supabase Project URL and publishable key belong in `EXPO_PUBLIC_*` variables. Never place service-role/secret credentials in the app.
 
-## Profile authorization
-RLS remains enabled on `public.profiles`.
+## Profiles/discovery
+Normal `public.profiles` SELECT/UPDATE remains self-only through RLS. Discovery uses narrow authenticated-only security-definer RPCs that return safe public fields only.
 
-Normal table access remains:
-- SELECT: own profile only
-- UPDATE: own profile only
-- direct app INSERT/DELETE: revoked
+## Phase 8 direct-chat security
+Clients cannot directly INSERT conversations or memberships. They must call `create_or_get_direct_conversation`.
 
-Phase 7 does **not** broaden the profiles SELECT policy to all authenticated users. Discovery instead uses two narrow authenticated-only `SECURITY DEFINER` functions with `search_path = ''`.
+The function:
+- requires a real authenticated `auth.uid()`
+- rejects self-chat
+- validates the target user through `public.profiles`
+- computes the pair key server-side
+- never accepts a client-supplied `direct_key`, creator UUID or membership role
+- creates only `member` roles for direct chats
+- relies on a unique index to prevent duplicate pair conversations under races
+- returns only the resulting conversation UUID
 
-## Discovery privacy boundary
-`search_profiles` and `get_public_profile` return only:
-- profile UUID
-- display name
-- username
-- avatar object path
-- bio
+## Conversation-list privacy
+`list_my_conversations` is a security-definer RPC because normal profile RLS intentionally prevents direct reading of another user's profile row. The function explicitly filters memberships by `auth.uid()` and returns only chat-safe peer profile fields.
 
-They never read or return `auth.users.email`, raw user metadata, credentials, tokens or private authentication data.
+No email, password data, auth metadata or token is exposed.
 
-Discovery controls:
-- authenticated callers only
-- minimum 2 search characters
-- maximum 20 results per request
-- own account excluded from search results
-- wildcard characters escaped server-side
-- no list-all/suggested-users endpoint
-
-The 2-character/20-row controls reduce casual directory enumeration but are not a substitute for production abuse controls. Rate limiting and anti-automation remain part of Phase 21 production hardening.
-
-## Avatar privacy
-The `avatars` bucket is public-read because profile photos are part of public discovery. Upload/update/delete remain restricted by Storage RLS to the authenticated user's own UUID folder.
-
-## Messaging authorization boundary
-Phase 6 messaging RLS remains unchanged: knowing a conversation or message UUID is insufficient to access it without membership.
+## Conversation-route authorization
+`get_conversation_summary` requires an actual membership row for the caller. A guessed/leaked conversation UUID does not reveal participant details.
 
 ## Security-definer rules
-Discovery RPCs and Phase 6 authorization helpers use an empty `search_path` and fully-qualified relation names. Execute privileges on discovery RPCs are revoked from `public` and `anon`, then granted only to `authenticated`.
+Phase 8 RPCs use `search_path = ''`, fully-qualified relation names, and explicit function EXECUTE grants. Execute is revoked from `public` and `anon`, then granted to `authenticated` only.
 
-## Dedicated production review
-Phase 21 remains the full security review, including abuse controls, search throttling, blocks/reports interaction, account deletion, media validation, dependency review and secrets.
+## Messaging RLS
+Phase 6 RLS remains the database authorization boundary for future message reads/writes. Membership is required regardless of client UI state.
+
+## Future hardening
+Phase 21 will add dedicated abuse/rate-limit review, blocks/reports integration, account deletion behavior, media validation, dependency review and monitoring.

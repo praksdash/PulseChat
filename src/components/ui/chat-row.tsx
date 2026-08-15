@@ -13,6 +13,7 @@ export type ChatRowModel = {
   online?: boolean;
   muted?: boolean;
   sentByMe?: boolean;
+  avatarUri?: string | null;
 };
 
 type ChatRowProps = {
@@ -31,7 +32,7 @@ export function ChatRow({ chat, onPress }: ChatRowProps) {
         styles.row,
         { backgroundColor: pressed ? theme.colors.surfaceMuted : theme.colors.surface },
       ]}>
-      <Avatar name={chat.name} online={chat.online} />
+      <Avatar name={chat.name} uri={chat.avatarUri} online={chat.online} />
       <View style={[styles.body, { borderBottomColor: theme.colors.divider }]}>
         <View style={styles.topLine}>
           <AppText variant="bodyStrong" numberOfLines={1} style={styles.name}>

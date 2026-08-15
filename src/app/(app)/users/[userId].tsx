@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, AppIcon, AppText, Avatar, EmptyState, SurfaceCard } from '@/components/ui';
+import { createOrGetDirectConversation } from '@/services/conversation-service';
 import { getAvatarPublicUrl } from '@/services/profile-service';
 import { getPublicUserProfile } from '@/services/user-discovery-service';
 import { useAppTheme } from '@/theme';
@@ -15,7 +16,9 @@ export default function PublicUserProfileScreen() {
   const resolvedUserId = Array.isArray(userId) ? userId[0] : userId;
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isStartingChat, setIsStartingChat] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [startChatError, setStartChatError] = useState<string | null>(null);
 
   const loadProfile = useCallback(async () => {
     if (!resolvedUserId) {
@@ -42,6 +45,33 @@ export default function PublicUserProfileScreen() {
   useEffect(() => {
     void loadProfile();
   }, [loadProfile]);
+
+  const startChat = async () => {
+    if (!profile || isStartingChat) return;
+
+    setIsStartingChat(true);
+    setStartChatError(null);
+
+    try {
+      const conversationId = await createOrGetDirectConversation(profile.id);
+      router.push({
+        pathname: '/chat/[conversationId]',
+        params: {
+          conversationId,
+          name: profile.display_name,
+        },
+      });
+    } catch (chatError) {
+      console.warn('Unable to start direct chat:', chatError);
+      setStartChatError(
+        chatError instanceof Error
+          ? chatError.message
+          : 'Unable to start this conversation right now.',
+      );
+    } finally {
+      setIsStartingChat(false);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -113,7 +143,7 @@ export default function PublicUserProfileScreen() {
               <View style={styles.privacyCopy}>
                 <AppText variant="bodyStrong">Privacy by default</AppText>
                 <AppText variant="caption" tone="secondary">
-                  PulseChat discovery exposes only public profile fields. Email addresses and authentication metadata stay private.
+                  Starting a chat shares only the conversation membership needed for messaging. Email addresses and authentication metadata stay private.
                 </AppText>
               </View>
             </View>
@@ -123,11 +153,18 @@ export default function PublicUserProfileScreen() {
             <AppButton
               label="Start chat"
               icon={{ ios: 'message.fill', android: 'chat', web: 'chat' }}
-              disabled
+              loading={isStartingChat}
+              onPress={() => void startChat()}
             />
-            <AppText variant="caption" tone="tertiary" style={styles.centerText}>
-              Direct-chat creation is intentionally enabled in Phase 8.
-            </AppText>
+            {startChatError ? (
+              <AppText variant="caption" tone="danger" style={styles.centerText}>
+                {startChatError}
+              </AppText>
+            ) : (
+              <AppText variant="caption" tone="tertiary" style={styles.centerText}>
+                If a direct chat already exists, PulseChat safely reopens the same conversation.
+              </AppText>
+            )}
           </View>
         </ScrollView>
       )}
