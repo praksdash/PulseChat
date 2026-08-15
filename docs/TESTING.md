@@ -1,38 +1,48 @@
 # PulseChat Testing
 
-## Phase 5 manual tests
+## Phase 6 database migration verification
+After running `202608150003_phase6_messaging_schema.sql`, run `supabase/phase6_verify.sql` in Supabase SQL Editor.
 
-### Happy path
-1. Log in.
-2. Profile → Edit profile.
-3. Update display name, username and bio.
-4. Select/crop an avatar.
-5. Save.
-6. Confirm Profile immediately shows all changes.
-7. Kill/reopen app and confirm changes persist.
+Expected tables:
+- `conversations`
+- `conversation_members`
+- `messages`
+- `message_receipts`
+- `attachments`
 
-### Username validation
-- `<3` characters rejected.
-- `>32` characters rejected.
-- spaces/symbols rejected.
-- uppercase input normalizes to lowercase.
-- blank username is allowed.
-- a username already owned by another account is rejected by both availability check and DB uniqueness.
+Each Phase 6 table must report `rls_enabled = true`.
 
-### Avatar security/behavior
-- denied photo permission produces a user-facing message.
-- selected image is compressed before upload.
-- avatar appears after save and survives restart.
-- replacing avatar removes the previous object after successful profile update.
-- remove avatar returns to initials.
-- user cannot upload/delete under another user's UUID folder.
+## Metadata checks
+Verify the policy list includes membership-gated SELECT policies and self-only receipt/read-state policies.
 
-### Failure path
-- network failure while checking username shows a non-destructive availability message.
-- network/storage failure during save keeps the edit screen open and shows an error.
-- if DB update fails after a new avatar upload, the newly uploaded object is cleaned up.
+Verify important indexes exist for:
+- direct-key uniqueness
+- memberships by `user_id`
+- message cursor pagination
+- sender/client-message deduplication
+- receipt lookup
+- attachment lookup
 
-### Regression
-- signup/login/session persistence still work.
-- Sign out returns directly to Login.
-- Chats/Search/Profile navigation still works.
+## Application regression test
+Because Phase 6 does not change active UI behavior:
+1. Launch Android app.
+2. Existing authenticated session restores.
+3. Profile screen loads.
+4. Edit Profile still works.
+5. Avatar still loads.
+6. Sign out still returns to Login.
+7. Sign in again succeeds.
+
+The Chats screen is still intentionally mock data until Phase 8/9.
+
+## Security tests scheduled with feature activation
+When Phase 8/9 adds real chat access, test with at least three accounts:
+- User A and B belong to conversation AB.
+- User C must not SELECT conversation AB.
+- User C must not SELECT messages from AB even with known UUIDs.
+- User A must not INSERT a message with `sender_id = B`.
+- A retry with the same `(sender_id, client_message_id)` must not create a duplicate.
+- A reply must not reference a message in another conversation.
+
+## Later automated tests
+Add pgTAP database authorization tests once the Supabase local-development/test harness is introduced. Manual SQL metadata verification is sufficient for this schema-only phase.

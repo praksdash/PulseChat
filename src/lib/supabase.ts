@@ -7,6 +7,8 @@ import * as aesjs from 'aes-js';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+import type { Database } from '@/types/database';
+
 const configuredUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim();
 const configuredKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
 
@@ -58,7 +60,7 @@ class LargeSecureStore {
 const supabaseUrl = configuredUrl || 'https://placeholder.supabase.co';
 const supabasePublishableKey = configuredKey || 'sb_publishable_placeholder';
 
-export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
+export const supabase = createClient<Database>(supabaseUrl, supabasePublishableKey, {
   auth: {
     ...(Platform.OS !== 'web' ? { storage: new LargeSecureStore() } : {}),
     autoRefreshToken: true,

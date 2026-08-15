@@ -1,23 +1,73 @@
 # PulseChat Architecture
 
-## Mobile
-React Native + Expo SDK 57 + TypeScript + Expo Router.
+## Current application architecture
 
-## Authentication
-Supabase Auth, persisted encrypted native sessions, protected `(auth)` and `(app)` route groups.
+```text
+Expo / React Native / TypeScript
+        │
+        ├── Expo Router
+        ├── AuthProvider
+        ├── reusable UI/theme
+        └── typed Supabase client
+                 │
+                 ├── Supabase Auth
+                 ├── PostgreSQL + RLS
+                 └── Supabase Storage (avatars)
+```
 
-## Profile feature
-`EditProfileScreen` owns form state and UX validation. Database/storage operations are delegated to Supabase and `src/services/profile-service.ts`.
+## Phase 6 database architecture
 
-Flow:
+```text
+Mobile client
+    │
+    │ publishable key + authenticated JWT
+    ▼
+Supabase Data API
+    │
+    ├── PostgreSQL grants
+    └── Row Level Security
+            │
+            ▼
+    conversation_members
+            │
+      authorization root
+       /      |       \
+      ▼       ▼        ▼
+conversations messages receipts
+                    │
+                    ▼
+                attachments
+```
 
-`Profile → Edit profile → validate → optional username RPC → optional image compress/upload → RLS-backed profile UPDATE → remove obsolete avatar → refresh AuthProvider profile → Profile`
+`conversation_members` is the authorization root for messaging. Membership checks live in non-exposed PulseChat-private database helpers to avoid recursive RLS policies.
 
-The profile row is authoritative. Auth `user_metadata` is not used for authorization.
+## Message lifecycle prepared by Phase 6
 
-## Avatar pipeline
+```text
+client creates client_message_id
+        ↓
+INSERT messages
+        ↓
+RLS checks sender + membership
+        ↓
+PostgreSQL uniqueness deduplicates retries
+        ↓
+server created_at establishes durable ordering
+        ↓
+trigger advances conversation.last_message_at
+        ↓
+Phase 9 will Broadcast the committed event
+```
 
-`ImagePicker → square crop → ImageManipulator 512×512 JPEG (~82% quality) → base64 → ArrayBuffer → Supabase Storage → avatar_path in profile → public URL via getPublicUrl()`
+Realtime is intentionally not enabled in Phase 6. Durable database persistence remains the source of truth; Realtime will be an event-delivery layer, not a replacement for the database.
 
-## Boundaries
-Phase 5 intentionally does not expose all profiles. Phase 7 introduces controlled user discovery. Phase 6 establishes messaging tables/RLS before any real chat traffic.
+## Type safety
+`src/types/database.ts` contains the Phase 6 Supabase schema types, and `src/lib/supabase.ts` now creates a typed Supabase client. This lets later chat services compile against explicit message/conversation shapes.
+
+## Deferred responsibilities
+- Phase 7: user discovery
+- Phase 8: transactional direct-chat creation
+- Phase 9: database-backed chat list/text messaging and Realtime Broadcast
+- Phase 10: delivery/read UI and service
+- Phase 12: media storage
+- Phase 14: group management

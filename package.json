@@ -49,7 +49,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "check:android": "expo export --platform android --output-dir dist-phase5-check"
+    "check:android": "expo export --platform android --output-dir dist-phase6-check"
   },
   "private": true
 }

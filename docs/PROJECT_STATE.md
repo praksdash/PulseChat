@@ -1,46 +1,59 @@
 # PulseChat Project State
 
 ## Current phase
-Phase 5 — User Profile
+Phase 6 — Database Architecture
 
 ## Completed
 - Phase 1 development environment and Android development build
 - Phase 2 Expo Router navigation skeleton
 - Phase 3 reusable design system and polished messenger UI
 - Phase 4 Supabase email/password authentication, persisted sessions, protected routes, profile trigger/RLS and working local sign-out
-- Phase 5 editable profile implementation in source
+- Phase 5 editable profile, unique username, bio and avatar Storage flow
+- Phase 6 production messaging database schema packaged
 
-## Phase 5 working target
-- Edit display name
-- Optional unique username (`a-z`, `0-9`, `_`, 3–32 chars)
-- Username availability check through a narrow security-definer RPC
-- Bio up to 160 characters
-- Avatar selection/crop from the device photo library
-- 512×512 JPEG compression before upload
-- Public `avatars` bucket for profile-picture delivery
-- Storage RLS restricting create/update/delete to each user's UUID folder
-- Replace/remove avatar with old-object cleanup
-- Profile screen renders real avatar, username and bio
+## Phase 6 database foundation
+- `conversations` supporting direct/group shapes
+- unique `direct_key` primitive for duplicate-direct-chat prevention
+- normalized `conversation_members`
+- roles: member/admin/owner
+- `last_read_at` read cursor and `muted_until`
+- durable `messages`
+- `client_message_id` retry deduplication
+- same-conversation reply integrity
+- server timestamps and pagination index
+- `message_receipts` for delivered/read state
+- attachment metadata foundation for Phase 12
+- conversation activity trigger (`last_message_at`)
+- membership-based RLS on all messaging tables
+- least-privilege table/column grants
+- non-exposed RLS authorization helpers
+- TypeScript database schema types / typed Supabase client
 
 ## Developer verification required
-1. Run `supabase/migrations/202608150002_phase5_profiles_avatars.sql` in Supabase SQL Editor.
-2. Install Phase 5 packages with `npm install`.
-3. Rebuild native directories/client because ImagePicker/ImageManipulator are native dependencies.
-4. Verify profile edit, username collision, avatar upload/remove and app restart on Android.
+1. Ensure Phase 5 migration has already been run.
+2. Run `supabase/migrations/202608150003_phase6_messaging_schema.sql` in Supabase SQL Editor.
+3. Run `supabase/phase6_verify.sql` and confirm five Phase 6 tables plus RLS/policies/indexes.
+4. Run `npm run typecheck` locally.
+5. Run the Android app and perform the Phase 5 regression test.
 
 ## Intentionally not implemented yet
-- Conversation/message database schema (Phase 6)
 - Global user search/discovery (Phase 7)
-- Chat creation and realtime messaging
-- Message/media attachments inside chats
-- Push notifications
+- Real direct-chat creation (Phase 8)
+- Database-backed chat list (Phase 8/9)
+- Realtime text delivery (Phase 9)
+- Delivery/read UI logic (Phase 10)
+- Typing/presence (Phase 11)
+- Chat-media Storage writes (Phase 12)
+- Message edit/delete/reactions (Phase 13)
+- Group creation/member management (Phase 14)
 
 ## Known bugs
-None known in Phase 5 source. Runtime verification against the developer's Supabase project is required.
+No new runtime UI behavior is introduced by Phase 6. Database migration must be verified against the developer's Supabase project.
 
 ## Database migrations
-- `202608150001_phase4_auth_profiles.sql` — completed by developer
-- `202608150002_phase5_profiles_avatars.sql` — run for Phase 5
+- `202608150001_phase4_auth_profiles.sql`
+- `202608150002_phase5_profiles_avatars.sql`
+- `202608150003_phase6_messaging_schema.sql`
 
 ## Environment variables
 Required locally in `.env` (never commit):
@@ -49,7 +62,7 @@ Required locally in `.env` (never commit):
 
 ## Git checkpoint
 After verification:
-`feat: add editable user profiles and avatars`
+`feat: add production messaging database schema`
 
 ## Next task
-Phase 6 — production messaging database architecture and RLS foundation.
+Phase 7 — controlled global user search/discovery.
