@@ -257,6 +257,7 @@ export type Database = {
           last_message_sender_id: string | null;
           last_message_created_at: string | null;
           last_activity_at: string;
+          unread_count: number;
         }>;
       };
       get_conversation_summary: {
@@ -290,7 +291,24 @@ export type Database = {
           created_at: string;
           edited_at: string | null;
           deleted_at: string | null;
+          delivery_status: 'sent' | 'delivered' | 'read' | null;
         }>;
+      };
+      get_my_total_unread_count: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      mark_conversation_delivered: {
+        Args: { target_conversation_id: string };
+        Returns: number;
+      };
+      mark_conversation_read: {
+        Args: { target_conversation_id: string };
+        Returns: number;
+      };
+      mark_all_pending_delivered: {
+        Args: Record<string, never>;
+        Returns: number;
       };
     };
     Enums: Record<string, never>;

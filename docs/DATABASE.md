@@ -12,55 +12,54 @@ auth.users
 ```
 
 ## `public.messages`
-Durable source of truth for messages.
-
-Important fields:
-- `id uuid` server primary key
-- `conversation_id uuid`
-- `sender_id uuid`
-- `client_message_id uuid` generated before network send
-- `message_type`
-- `body`
-- `created_at`
-- future `reply_to_message_id`, `edited_at`, `deleted_at`
-
-Critical constraints/indexes:
-- `UNIQUE(sender_id, client_message_id)` — retry idempotency
-- `(conversation_id, created_at DESC, id DESC)` — stable history pagination
-- text body max 10,000 characters
-- RLS: SELECT only for conversation members; INSERT only as `auth.uid()` into one of the caller's conversations
-
-## Phase 9 history function
-
-`public.list_conversation_messages(target_conversation_id, before_created_at, before_id, result_limit)`
-
-- `SECURITY INVOKER`
-- therefore message-table RLS remains active
-- returns newest first
-- uses `(created_at, id)` as stable cursor
-- default 30 rows, server cap 50
-- a non-member gets no accessible messages
-
-## Phase 9 database Broadcast
-
-An `AFTER INSERT` trigger on `public.messages` calls:
-
-```text
-realtime.broadcast_changes(
-  conversation:<conversation UUID>,
-  INSERT,
-  ...
-)
-```
-
-The database event is private and conversation-scoped. Clients do not need to enable Postgres Changes publication for this architecture.
+Durable message source of truth. Important guarantees:
+- `UNIQUE(sender_id, client_message_id)` for retry idempotency
+- `(conversation_id, created_at DESC, id DESC)` for cursor pagination
+- member-only read RLS
+- sender-self/member-only insert RLS
 
 ## `public.message_receipts`
-Already exists from Phase 6 but Phase 9 intentionally does not use it for UI state. Delivered/read implementation begins in Phase 10.
+One row per message recipient.
 
-## Future migrations
-- Phase 9: text messaging + Realtime Broadcast ✅
-- Phase 10: delivery/read service and unread/read behavior
-- Phase 12: `chat-media` Storage + attachment writes
-- Phase 13: edit/delete/reactions
-- Phase 14: group creation/member administration
+Fields:
+- `message_id`
+- `user_id` recipient
+- `delivered_at`
+- `read_at`
+- audit timestamps
+
+Rules:
+- sender does not get their own receipt row
+- read requires delivered
+- one row per `(message_id, user_id)`
+- `message_receipts_user_unread_idx` accelerates own unread lookup
+
+Phase 10 `create_message_receipts` trigger populates recipient rows after message insert and the migration backfills prior Phase 9 messages.
+
+## Phase 10 RPCs
+
+### `list_conversation_messages(...)`
+Returns the Phase 9 page plus `delivery_status` for caller-owned outgoing messages:
+- `sent`
+- `delivered`
+- `read`
+
+For multiple recipients, delivered/read becomes true only when every receipt row reaches that state.
+
+### `list_my_conversations(result_limit)`
+Returns the existing conversation summary plus `unread_count` calculated from current-user receipt rows where `read_at IS NULL`.
+
+### `get_my_total_unread_count()`
+Lightweight total unread count for the Chats tab badge.
+
+### `mark_conversation_delivered(conversation_id)`
+Batch-fills current user's pending `delivered_at` values and emits one receipt cursor event.
+
+### `mark_conversation_read(conversation_id)`
+Batch-fills delivered/read, advances current membership `last_read_at`, and emits one read cursor event.
+
+### `mark_all_pending_delivered()`
+Startup/reconnect reconciliation for messages persisted while no WebSocket session existed.
+
+## Realtime
+Message INSERT remains durable first. The Phase 9 trigger is extended in Phase 10 to additionally send minimal `inbox_message` events to each recipient's private `user:<uuid>` topic.

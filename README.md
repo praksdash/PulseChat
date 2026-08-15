@@ -3,24 +3,26 @@
 Telegram-inspired messaging application built with React Native, Expo Router, TypeScript and Supabase.
 
 ## Current milestone
-Phase 9 — real realtime one-to-one text messaging.
+Phase 10 — real delivery/read receipts and unread counters.
 
 Implemented:
 - Android Expo development build
-- navigation and reusable messenger design system
+- navigation + reusable messenger design system
 - Supabase email/password auth + persisted sessions
 - editable profiles, usernames, bios and avatars
 - production conversation/member/message/receipt/attachment schema
 - secure user discovery
 - idempotent direct-chat creation
 - real Supabase-backed Chats list
-- durable text-message sending
-- optimistic message bubbles + failed-send retry
-- cursor-paginated message history
-- private conversation-scoped Supabase Realtime Broadcast
-- membership-based Realtime Authorization
-- reconnect reconciliation against PostgreSQL
+- durable text messaging + optimistic retry
+- cursor-paginated history
+- private conversation-scoped Realtime Broadcast
+- private authenticated user inbox Broadcast
+- delivered/read receipt persistence
+- live sent/delivered/read ticks
+- per-conversation unread badges + Chats tab total
+- read cursor (`last_read_at`) updates
 
-Delivered/read states intentionally begin in Phase 10.
+Typing/presence begins in Phase 11.
 
-See `PHASE9_README.txt` and `docs/PROJECT_STATE.md`.
+See `PHASE10_README.txt` and `docs/PROJECT_STATE.md`.

@@ -2,7 +2,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import { supabase } from '@/lib/supabase';
 import type { Message } from '@/types/database';
-import type { MessageCursor, MessagePageRow } from '@/types/message';
+import type { MessageCursor, MessagePageRow, ReceiptCursorEvent } from '@/types/message';
 
 export const MESSAGE_PAGE_SIZE = 30;
 export const MAX_TEXT_MESSAGE_LENGTH = 10_000;
@@ -69,9 +69,9 @@ export async function sendTextMessage(input: {
     return data as Message;
   }
 
-  // If the request reached PostgreSQL but the response was lost, retrying with
-  // the same client_message_id hits the unique constraint. Resolve that race by
-  // fetching the already-committed row instead of creating a duplicate.
+  // If PostgreSQL committed the request but the network response was lost,
+  // retrying with the same client_message_id hits the unique constraint. Fetch
+  // the existing durable row instead of creating a duplicate.
   if (error?.code === '23505') {
     const { data: existing, error: existingError } = await supabase
       .from('messages')
@@ -92,6 +92,7 @@ type RealtimeState = 'connecting' | 'connected' | 'reconnecting';
 type SubscribeOptions = {
   conversationId: string;
   onMessage: (message: Message) => void;
+  onReceiptState?: (event: ReceiptCursorEvent) => void;
   onStateChange?: (state: RealtimeState) => void;
   onError?: (error: unknown) => void;
 };
@@ -134,9 +135,40 @@ function extractBroadcastMessage(event: unknown): Message | null {
   return asMessageRecord(root.record);
 }
 
+function extractReceiptCursor(
+  event: unknown,
+  type: ReceiptCursorEvent['type'],
+): ReceiptCursorEvent | null {
+  if (!event || typeof event !== 'object') return null;
+  const root = event as Record<string, unknown>;
+  const payload = root.payload;
+  if (!payload || typeof payload !== 'object') return null;
+
+  const record = payload as Record<string, unknown>;
+  const conversationId = record.conversation_id;
+  const recipientUserId = record.recipient_user_id;
+  const throughCreatedAt = record.through_created_at;
+
+  if (
+    typeof conversationId !== 'string'
+    || typeof recipientUserId !== 'string'
+    || typeof throughCreatedAt !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    type,
+    conversationId,
+    recipientUserId,
+    throughCreatedAt,
+  };
+}
+
 export function subscribeToConversationMessages({
   conversationId,
   onMessage,
+  onReceiptState,
   onStateChange,
   onError,
 }: SubscribeOptions) {
@@ -159,6 +191,16 @@ export function subscribeToConversationMessages({
           const message = extractBroadcastMessage(event);
           if (!message || message.conversation_id !== conversationId) return;
           onMessage(message);
+        })
+        .on('broadcast', { event: 'receipt_delivered' }, (event: unknown) => {
+          const receipt = extractReceiptCursor(event, 'delivered');
+          if (!receipt || receipt.conversationId !== conversationId) return;
+          onReceiptState?.(receipt);
+        })
+        .on('broadcast', { event: 'receipt_read' }, (event: unknown) => {
+          const receipt = extractReceiptCursor(event, 'read');
+          if (!receipt || receipt.conversationId !== conversationId) return;
+          onReceiptState?.(receipt);
         })
         .subscribe((status: string, error?: Error) => {
           if (disposed) return;

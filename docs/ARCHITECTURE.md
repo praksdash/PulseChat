@@ -7,93 +7,79 @@ Expo / React Native / TypeScript
         │
         ├── Expo Router
         ├── AuthProvider
-        ├── reusable UI/theme
-        ├── profile + discovery services
+        ├── UI/theme
+        ├── profile/discovery services
         ├── conversation service
-        ├── message service + conversation-message hook
+        ├── message + receipt services
+        ├── authenticated inbox Realtime service
         └── typed Supabase client
                  │
                  ├── Supabase Auth
                  ├── PostgreSQL + RLS
                  │      ├── profiles/discovery
                  │      ├── conversations/members
-                 │      └── durable messages
-                 ├── Supabase Realtime
-                 │      └── private conversation:<uuid> Broadcast
+                 │      ├── durable messages
+                 │      └── per-recipient receipts
+                 ├── Supabase Realtime Broadcast
+                 │      ├── conversation:<uuid>
+                 │      └── user:<uuid>
                  └── Supabase Storage
                         └── avatars
 ```
 
-## Phase 9 send flow
+## Phase 10 message lifecycle
 
 ```text
-User taps Send
-      ↓
-client generates client_message_id UUID
-      ↓
-optimistic bubble appears immediately
-      ↓
-INSERT public.messages
-      ↓
-Phase 6 RLS verifies sender == auth.uid() + membership
-      ↓
-UNIQUE(sender_id, client_message_id) prevents retry duplicates
-      ↓
-PostgreSQL commits durable row
-      ├── touch conversation.last_message_at
-      └── Phase 9 AFTER INSERT trigger
-                 ↓
-        realtime.broadcast_changes()
-                 ↓
-       private topic conversation:<uuid>
-                 ↓
-      authorized conversation members
-```
-
-The application never treats a WebSocket event as durable storage. Initial load and reconnect reconciliation always read PostgreSQL.
-
-## Realtime authorization
-
-Clients subscribe with:
-
-```text
-conversation:<conversation UUID>
-private = true
-```
-
-A SELECT policy on `realtime.messages` permits Broadcast reception only when `auth.uid()` has a matching row in `public.conversation_members` for that topic. Phase 9 does not grant app clients INSERT permission into Realtime Broadcast topics; sends happen through durable `public.messages` INSERTs.
-
-## Message history
-
-```text
-Newest 30
-   ↓ user scrolls upward
-cursor = oldest server (created_at, id)
+A taps Send
    ↓
-previous 30
+optimistic message
+   ↓
+INSERT public.messages
+   ↓
+receipt trigger creates B receipt (null/null)
+   ↓
+commit
+   ├── conversation:<uuid> INSERT broadcast
+   └── user:<B uuid> inbox_message broadcast
+                         ↓
+                     B app connected
+                         ↓
+               mark_conversation_delivered
+                         ↓
+                receipt.delivered_at
+                         ↓
+        conversation:<uuid> receipt_delivered
+                         ↓
+                    A shows ✓✓
+
+B opens chat while app active
+   ↓
+mark_conversation_read
+   ↓
+receipt.read_at + member.last_read_at
+   ↓
+conversation:<uuid> receipt_read
+   ↓
+A shows read-colored ✓✓
 ```
 
-`public.list_conversation_messages` is `SECURITY INVOKER`, so normal `messages` RLS remains active. The existing `(conversation_id, created_at DESC, id DESC)` index supports the ordering/cursor.
+## Source of truth
+PostgreSQL remains authoritative for both message content and receipt state. Realtime events are hints for low-latency UI updates. Message/history refetches restore state after reconnect or app restart.
 
-## Optimistic retry
+## Inbox topic
+`user:<auth uid>` is a private database-Broadcast topic. Only that authenticated user may subscribe. It contains only minimal message identifiers/timestamps, not another user's private profile/auth data.
 
-```text
-optimistic client_message_id X
-        ↓
-request reaches DB but network response is lost
-        ↓
-retry uses X again
-        ↓
-UNIQUE violation instead of duplicate row
-        ↓
-client fetches committed row for X
-        ↓
-optimistic bubble becomes server bubble
-```
+## Conversation topic
+`conversation:<conversation uuid>` remains private and membership-authorized. It carries committed message inserts plus receipt cursor events.
 
-## Deferred responsibilities
-- Phase 10: delivery/read receipts + unread/read cursor UI
-- Phase 11: typing/presence
-- Phase 12: media storage/messages
-- Phase 13: replies/edit/delete/reactions
-- Phase 14: group management
+## Receipt cursor events
+Receipt updates are broadcast as a monotonic `through_created_at` cursor instead of one WebSocket event per message. The client updates visible ticks immediately and then reconciles latest PostgreSQL state.
+
+## Unread state
+`message_receipts.read_at IS NULL` is the authoritative unread source. `conversation_members.last_read_at` is also maintained as a useful conversation read cursor for later query/UX features.
+
+## Deferred
+- Phase 11: presence/typing/last seen
+- Phase 12: chat media
+- Phase 13: reply/edit/delete/reactions
+- Phase 14: group UI/admin semantics

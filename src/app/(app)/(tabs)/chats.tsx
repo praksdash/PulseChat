@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -7,6 +7,7 @@ import { AppButton, AppIcon, AppText, ChatRow, type ChatRowModel, EmptyState, Se
 import { useAuth } from '@/hooks/use-auth';
 import { getAvatarPublicUrl } from '@/services/profile-service';
 import { listMyConversations } from '@/services/conversation-service';
+import { subscribeToConversationActivity } from '@/services/conversation-events';
 import { useAppTheme } from '@/theme';
 import type { ConversationListItem } from '@/types/conversation';
 
@@ -54,6 +55,7 @@ function toChatRow(item: ConversationListItem, currentUserId: string | undefined
     preview: item.last_message_preview ?? 'No messages yet — say hello.',
     time: formatConversationTime(item.last_message_created_at ?? item.last_activity_at),
     sentByMe: hasLastMessage && item.last_message_sender_id === currentUserId,
+    unread: item.unread_count ?? 0,
   };
 }
 
@@ -66,7 +68,7 @@ export default function ChatsScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadConversations = useCallback(async (mode: 'load' | 'refresh' = 'load') => {
+  const loadConversations = useCallback(async (mode: 'load' | 'refresh' | 'background' = 'load') => {
     if (mode === 'load') setIsLoading(true);
     if (mode === 'refresh') setIsRefreshing(true);
     setError(null);
@@ -88,6 +90,10 @@ export default function ChatsScreen() {
       void loadConversations('load');
     }, [loadConversations]),
   );
+
+  useEffect(() => subscribeToConversationActivity(() => {
+    void loadConversations('background');
+  }), [loadConversations]);
 
   const visibleConversations = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -197,7 +203,9 @@ export default function ChatsScreen() {
         <View>
           <AppText variant="title">PulseChat</AppText>
           <AppText variant="caption" tone="secondary">
-            {conversations.length === 1 ? '1 conversation' : `${conversations.length} conversations`}
+            {conversations.reduce((sum, item) => sum + (item.unread_count ?? 0), 0) > 0
+              ? `${conversations.reduce((sum, item) => sum + (item.unread_count ?? 0), 0)} unread`
+              : (conversations.length === 1 ? '1 conversation' : `${conversations.length} conversations`)}
           </AppText>
         </View>
         <Pressable

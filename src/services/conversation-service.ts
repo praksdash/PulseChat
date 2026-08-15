@@ -52,3 +52,13 @@ export async function getConversationSummary(
 
   return data?.[0] ?? null;
 }
+export async function getMyTotalUnreadCount(): Promise<number> {
+  const { data, error } = await supabase.rpc('get_my_total_unread_count', {});
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return typeof data === 'number' && Number.isFinite(data) ? data : 0;
+}
+

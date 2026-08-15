@@ -48,7 +48,9 @@ export function ChatRow({ chat, onPress }: ChatRowProps) {
           </AppText>
           {chat.unread ? (
             <View style={[styles.badge, { backgroundColor: theme.colors.primary }]}>
-              <AppText variant="micro" tone="inverse" style={styles.badgeText}>{chat.unread}</AppText>
+              <AppText variant="micro" tone="inverse" style={styles.badgeText}>
+                {chat.unread > 99 ? '99+' : chat.unread}
+              </AppText>
             </View>
           ) : null}
         </View>

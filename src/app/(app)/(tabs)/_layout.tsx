@@ -1,10 +1,32 @@
 import { Tabs } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 
 import { AppIcon } from '@/components/ui';
+import { getMyTotalUnreadCount } from '@/services/conversation-service';
+import { subscribeToConversationActivity } from '@/services/conversation-events';
 import { useAppTheme } from '@/theme';
 
 export default function TabsLayout() {
   const theme = useAppTheme();
+  const [totalUnread, setTotalUnread] = useState(0);
+
+  const refreshUnread = useCallback(async () => {
+    try {
+      const count = await getMyTotalUnreadCount();
+      setTotalUnread(count);
+    } catch (error) {
+      console.warn('Unable to load total unread count:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshUnread();
+    return subscribeToConversationActivity(() => {
+      void refreshUnread();
+    });
+  }, [refreshUnread]);
+
+  const badge = totalUnread > 0 ? (totalUnread > 99 ? '99+' : totalUnread) : undefined;
 
   return (
     <Tabs
@@ -25,6 +47,13 @@ export default function TabsLayout() {
         name="chats"
         options={{
           title: 'Chats',
+          tabBarBadge: badge,
+          tabBarBadgeStyle: {
+            backgroundColor: theme.colors.danger,
+            color: '#FFFFFF',
+            fontSize: 10,
+            fontWeight: '700',
+          },
           tabBarIcon: ({ color, size }) => (
             <AppIcon
               name={{ ios: 'bubble.left.and.bubble.right.fill', android: 'forum', web: 'forum' }}

@@ -1,54 +1,40 @@
 # PulseChat API / Data Access
 
-## Existing profile/discovery RPCs
-- `public.is_username_available(candidate text)`
-- `public.search_profiles(search_term text, result_limit integer default 20)`
-- `public.get_public_profile(target_user_id uuid)`
+## Profile/discovery RPCs
+- `is_username_available`
+- `search_profiles`
+- `get_public_profile`
 
-## Existing conversation RPCs
-- `public.create_or_get_direct_conversation(target_user_id uuid)`
-- `public.list_my_conversations(result_limit integer default 50)`
-- `public.get_conversation_summary(target_conversation_id uuid)`
+## Conversation RPCs
+- `create_or_get_direct_conversation`
+- `list_my_conversations` — now includes `unread_count`
+- `get_conversation_summary`
+- `get_my_total_unread_count`
 
-## Phase 9 message history RPC
+## Message RPC
+### `list_conversation_messages(...)`
+Phase 10 output includes `delivery_status` for the current sender's outgoing rows while retaining stable cursor pagination and message-table RLS.
 
-### `public.list_conversation_messages(...)`
-Arguments:
-- `target_conversation_id uuid`
-- `before_created_at timestamptz default null`
-- `before_id uuid default null`
-- `result_limit integer default 30`
+## Receipt RPCs
+### `mark_conversation_delivered(target_conversation_id)`
+Marks the authenticated recipient's pending receipt rows delivered.
 
-Behavior:
-- `SECURITY INVOKER`
-- RLS-protected
-- newest-first stable cursor pagination
-- server limit capped to 50
+### `mark_conversation_read(target_conversation_id)`
+Marks pending receipt rows delivered/read and advances `last_read_at`.
 
-## Phase 9 direct table write
+### `mark_all_pending_delivered()`
+Marks persisted messages delivered when the authenticated app reconnects/starts.
 
-### INSERT `public.messages`
-The client sends only:
-- `conversation_id`
-- `sender_id`
-- `client_message_id`
-- `message_type = text`
-- `body`
-- optional future `reply_to_message_id`
+## Direct message write
+The client still inserts text messages through `public.messages` with Phase 6 column privileges/RLS and `client_message_id` idempotency.
 
-RLS and table-column grants enforce the boundary.
+## Realtime topics
+### `conversation:<uuid>`
+Private. Membership-authorized. Events:
+- `INSERT` — committed new message
+- `receipt_delivered`
+- `receipt_read`
 
-## Phase 9 Realtime
-Topic:
-
-```text
-conversation:<conversation UUID>
-```
-
-Channel config:
-
-```text
-private: true
-```
-
-The client listens for Broadcast event `INSERT`. Database triggers generate the event only after a durable message insert.
+### `user:<uuid>`
+Private. Self-authorized only. Event:
+- `inbox_message` — minimal notification that one of the user's conversations received a durable message

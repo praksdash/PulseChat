@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import {
   createClientMessageId,
@@ -7,10 +8,18 @@ import {
   sendTextMessage,
   subscribeToConversationMessages,
 } from '@/services/message-service';
+import { markConversationRead } from '@/services/receipt-service';
 import type { Message } from '@/types/database';
-import type { ChatMessage, MessageCursor } from '@/types/message';
+import type {
+  ChatMessage,
+  MessageCursor,
+  MessageDeliveryStatus,
+  MessagePageRow,
+  ReceiptCursorEvent,
+} from '@/types/message';
 
 type RealtimeState = 'connecting' | 'connected' | 'reconnecting';
+type ServerMessage = Message | MessagePageRow;
 
 function compareNewestFirst(a: ChatMessage, b: ChatMessage) {
   const timeDifference = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -18,26 +27,40 @@ function compareNewestFirst(a: ChatMessage, b: ChatMessage) {
   return b.id.localeCompare(a.id);
 }
 
-function normalizeServerMessage(message: Message, currentUserId: string): ChatMessage {
+function toMessageRecord(message: ServerMessage): Message {
+  const { delivery_status: _deliveryStatus, ...record } = message as MessagePageRow;
+  return record as Message;
+}
+
+function getDeliveryStatus(message: ServerMessage): MessageDeliveryStatus | null {
+  const status = (message as MessagePageRow).delivery_status;
+  return status === 'sent' || status === 'delivered' || status === 'read' ? status : null;
+}
+
+function normalizeServerMessage(message: ServerMessage, currentUserId: string): ChatMessage {
+  const record = toMessageRecord(message);
   return {
-    ...message,
+    ...record,
     isOptimistic: false,
-    localState: message.sender_id === currentUserId ? 'sent' : undefined,
+    localState: record.sender_id === currentUserId
+      ? (getDeliveryStatus(message) ?? 'sent')
+      : undefined,
   };
 }
 
 function mergeServerMessage(
   current: ChatMessage[],
-  incoming: Message,
+  incoming: ServerMessage,
   currentUserId: string,
 ): ChatMessage[] {
+  const record = toMessageRecord(incoming);
   const normalized = normalizeServerMessage(incoming, currentUserId);
   const withoutDuplicate = current.filter((message) => {
-    if (message.id === incoming.id) return false;
+    if (message.id === record.id) return false;
 
     return !(
-      message.sender_id === incoming.sender_id
-      && message.client_message_id === incoming.client_message_id
+      message.sender_id === record.sender_id
+      && message.client_message_id === record.client_message_id
     );
   });
 
@@ -46,7 +69,7 @@ function mergeServerMessage(
 
 function mergeServerMessages(
   current: ChatMessage[],
-  incoming: Message[],
+  incoming: ServerMessage[],
   currentUserId: string,
 ): ChatMessage[] {
   return incoming.reduce(
@@ -55,7 +78,38 @@ function mergeServerMessages(
   );
 }
 
-export function useConversationMessages(conversationId: string | undefined, currentUserId: string | undefined) {
+function applyReceiptCursor(
+  current: ChatMessage[],
+  event: ReceiptCursorEvent,
+  currentUserId: string,
+): ChatMessage[] {
+  const cutoff = new Date(event.throughCreatedAt).getTime();
+  if (Number.isNaN(cutoff)) return current;
+
+  return current.map((message) => {
+    if (
+      message.sender_id !== currentUserId
+      || message.isOptimistic
+      || message.localState === 'failed'
+      || message.localState === 'sending'
+      || new Date(message.created_at).getTime() > cutoff
+    ) {
+      return message;
+    }
+
+    if (event.type === 'read') {
+      return { ...message, localState: 'read' as const };
+    }
+
+    if (message.localState === 'read') return message;
+    return { ...message, localState: 'delivered' as const };
+  });
+}
+
+export function useConversationMessages(
+  conversationId: string | undefined,
+  currentUserId: string | undefined,
+) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
@@ -70,6 +124,17 @@ export function useConversationMessages(conversationId: string | undefined, curr
       mountedRef.current = false;
     };
   }, []);
+
+  const markRead = useCallback(async () => {
+    if (!conversationId || !currentUserId || AppState.currentState !== 'active') return;
+
+    try {
+      await markConversationRead(conversationId);
+    } catch (error) {
+      // A receipt failure must never block reading/sending the conversation.
+      console.warn('Unable to mark conversation read:', error);
+    }
+  }, [conversationId, currentUserId]);
 
   const loadInitial = useCallback(async () => {
     if (!conversationId || !currentUserId) {
@@ -88,6 +153,7 @@ export function useConversationMessages(conversationId: string | undefined, curr
 
       setMessages((current) => mergeServerMessages(current, page, currentUserId));
       setHasMore(page.length >= MESSAGE_PAGE_SIZE);
+      void markRead();
     } catch (error) {
       console.warn('Unable to load messages:', error);
       if (!mountedRef.current) return;
@@ -95,7 +161,7 @@ export function useConversationMessages(conversationId: string | undefined, curr
     } finally {
       if (mountedRef.current) setIsInitialLoading(false);
     }
-  }, [conversationId, currentUserId]);
+  }, [conversationId, currentUserId, markRead]);
 
   const refreshLatest = useCallback(async () => {
     if (!conversationId || !currentUserId) return;
@@ -105,10 +171,11 @@ export function useConversationMessages(conversationId: string | undefined, curr
       if (!mountedRef.current) return;
       setMessages((current) => mergeServerMessages(current, page, currentUserId));
       setLoadError(null);
+      void markRead();
     } catch (error) {
       console.warn('Unable to reconcile latest messages:', error);
     }
-  }, [conversationId, currentUserId]);
+  }, [conversationId, currentUserId, markRead]);
 
   useEffect(() => {
     setMessages([]);
@@ -124,18 +191,37 @@ export function useConversationMessages(conversationId: string | undefined, curr
       conversationId,
       onMessage: (message) => {
         setMessages((current) => mergeServerMessage(current, message, currentUserId));
+        if (message.sender_id !== currentUserId) {
+          void markRead();
+        }
+      },
+      onReceiptState: (event) => {
+        // Cursor application makes the tick update instant for current direct
+        // chats. A reconciliation fetch then remains the authoritative fallback.
+        setMessages((current) => applyReceiptCursor(current, event, currentUserId));
+        void refreshLatest();
       },
       onStateChange: (state) => {
         setRealtimeState(state);
         if (state === 'connected') {
           // PostgreSQL is authoritative. Reconcile after each successful join so
-          // reconnects cannot leave a permanent gap if WebSocket events were missed.
+          // reconnects cannot leave message or receipt gaps.
           void refreshLatest();
         }
       },
       onError: (error) => console.warn('Realtime conversation channel:', error),
     });
-  }, [conversationId, currentUserId, refreshLatest]);
+  }, [conversationId, currentUserId, markRead, refreshLatest]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void refreshLatest();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [refreshLatest]);
 
   const loadOlder = useCallback(async () => {
     if (!conversationId || !currentUserId || isLoadingOlder || !hasMore) return;

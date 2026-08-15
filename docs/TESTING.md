@@ -1,55 +1,53 @@
 # PulseChat Testing
 
-## Phase 9 migration verification
-After `202608150006_phase9_realtime_text_messaging.sql`, run `supabase/phase9_verify.sql`.
+## Phase 10 migration verification
+Run `supabase/phase10_verify.sql` after the migration.
 
 Verify:
-- `list_conversation_messages` exists and is not SECURITY DEFINER
-- authenticated execute = true; anon execute = false
-- `broadcast_new_message` is an AFTER INSERT trigger on `public.messages`
-- `pulsechat_members_receive_conversation_broadcasts` exists on `realtime.messages`
-- Phase 6 message indexes still exist
+- new receipt/read/unread RPCs exist
+- receipt creation trigger is enabled
+- private Realtime policy exists
+- receipt unread index exists
+- receipt backfill missing-row query returns 0 rows
+- sender-own-receipt query returns 0 rows
 
-## Happy path — two live clients
-1. Login as Account A on client/device A.
-2. Login as Account B on client/device B.
-3. Open the same direct conversation on both.
-4. Send `Hello from A` on A.
-5. The outgoing bubble appears immediately on A.
-6. The message becomes sent after PostgreSQL acknowledgement.
-7. B receives it without manually refreshing.
-8. Send a reply from B and verify A receives it live.
-9. Close/reopen the chat and confirm history is loaded from PostgreSQL.
+## Sent → delivered → read happy path
+1. Login A and B on separate clients.
+2. Keep A inside the A/B conversation.
+3. Keep B signed out/closed or disconnected.
+4. A sends a message; it reaches `sent` only.
+5. Open B and let the authenticated app connect without opening the chat.
+6. A should upgrade to `delivered` (double check).
+7. Open A/B chat on B while the app is active.
+8. A should upgrade to `read` (primary/read-colored double check).
 
-## Retry/idempotency
-1. Disable network.
-2. Send a message.
-3. The optimistic bubble should become `Not sent · Tap to retry`.
-4. Restore network.
-5. Tap the failed state to retry.
-6. Exactly one message row must exist for that `client_message_id`.
+## Unread counters
+1. Keep B outside the A/B chat.
+2. A sends 3 messages.
+3. B Chats row should show 3 unread; Chats tab badge should include those 3.
+4. Open the conversation on B.
+5. Return to Chats; row badge should be gone and total tab badge decremented.
 
-## Pagination
-1. Produce at least 35 messages in one conversation.
-2. Reopen the conversation.
-3. Initial page should load quickly.
-4. Scroll upward to load older history.
-5. No duplicate rows should appear at the page boundary.
+## Persistence/reconnect
+1. Produce sent/delivered/read states.
+2. Close both apps.
+3. Reopen A and conversation.
+4. Status must be restored from PostgreSQL.
+5. Send to B while B is offline.
+6. Reopen B; pending delivery reconciliation should move A to delivered.
 
-## Realtime authorization security
-- Account C, not a member of the A/B conversation, must not be able to join its private `conversation:<uuid>` Broadcast topic.
-- Account C must not be able to read A/B rows through `list_conversation_messages` or normal message SELECT.
-- Anon must not execute `list_conversation_messages`.
+## Read correctness
+- Incoming messages must not be marked read merely because the chat route exists while the app is backgrounded.
+- They should become read when the app becomes active with that conversation open.
 
-## Reconnect/source-of-truth test
-1. Open chat on B.
-2. Temporarily interrupt B's connection.
-3. Send one or more messages from A.
-4. Restore B's connection.
-5. After the channel reconnects, latest-page reconciliation should fill any missed rows from PostgreSQL.
+## Security
+- Account C cannot subscribe to `conversation:<A/B uuid>`.
+- Account C cannot subscribe to `user:<A uuid>`.
+- A cannot ask mark/read RPCs to modify B receipts; acting user is always derived server-side.
+- anon cannot execute Phase 10 public RPCs.
 
 ## Regression
-Authentication, persisted sessions, profile edit/avatar, sign-out, discovery, direct-chat creation, Chats list and Phase 6 RLS behavior must continue to work.
+Auth, persistent session, profile/avatar, discovery, chat creation, message send/retry, pagination and realtime receive must still work.
 
-## Intentionally deferred
-Delivered/read receipts and unread counters are Phase 10; typing/presence is Phase 11.
+## Deferred
+Typing/presence is Phase 11; media is Phase 12.
