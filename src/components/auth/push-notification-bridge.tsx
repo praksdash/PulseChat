@@ -1,0 +1,140 @@
+import type * as Notifications from 'expo-notifications';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useRef } from 'react';
+import { AppState, Platform } from 'react-native';
+
+import { useAuth } from '@/hooks/use-auth';
+import { getConversationSummary } from '@/services/conversation-service';
+import { emitConversationActivity, subscribeToConversationActivity } from '@/services/conversation-events';
+import {
+  clearLastNotificationResponse,
+  getLastNotificationResponse,
+  registerForPushNotifications,
+  resumePushRegistration,
+  subscribeToForegroundNotifications,
+  subscribeToNativePushTokenChanges,
+  subscribeToNotificationResponses,
+  syncApplicationBadge,
+} from '@/services/push-notification-service';
+
+function isUuid(value: unknown): value is string {
+  return typeof value === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function getConversationIdFromNotification(notification: Notifications.Notification) {
+  const data = notification.request.content.data as Record<string, unknown> | undefined;
+  return isUuid(data?.conversationId) ? data.conversationId : null;
+}
+
+export function PushNotificationBridge() {
+  const { user } = useAuth();
+  const handledResponseIds = useRef(new Set<string>());
+  const badgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleBadgeSync = useCallback(() => {
+    if (Platform.OS === 'web') return;
+    if (badgeTimerRef.current) clearTimeout(badgeTimerRef.current);
+    badgeTimerRef.current = setTimeout(() => {
+      badgeTimerRef.current = null;
+      void syncApplicationBadge().catch((error) => {
+        console.warn('Unable to sync notification badge:', error);
+      });
+    }, 180);
+  }, []);
+
+  const handleNotificationResponse = useCallback(async (response: Notifications.NotificationResponse) => {
+    if (!user?.id) return;
+
+    const requestId = response.notification.request.identifier;
+    if (handledResponseIds.current.has(requestId)) return;
+    handledResponseIds.current.add(requestId);
+
+    const conversationId = getConversationIdFromNotification(response.notification);
+    if (!conversationId) return;
+
+    // Consume the launch response once even when membership has since changed.
+    // Otherwise a removed user's stale group notification would be retried on
+    // every authenticated layout mount.
+    await clearLastNotificationResponse().catch(() => undefined);
+
+    try {
+      // Never navigate solely because arbitrary notification data contains a
+      // UUID. The server projection confirms the signed-in user is still a
+      // member (important after group removal).
+      const summary = await getConversationSummary(conversationId);
+      if (!summary) return;
+
+      router.push({
+        pathname: '/chat/[conversationId]',
+        params: {
+          conversationId,
+          name: summary.display_name,
+        },
+      });
+    } catch (error) {
+      console.warn('Unable to open notification conversation:', error);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || Platform.OS === 'web') return undefined;
+
+    resumePushRegistration();
+    void registerForPushNotifications()
+      .then((result) => {
+        if (result.status === 'denied') {
+          console.info('PulseChat notifications are disabled by device permission.');
+        }
+      })
+      .catch((error) => {
+        console.warn('Unable to register for push notifications:', error);
+      });
+
+    const unsubscribeTokenChanges = subscribeToNativePushTokenChanges((error) => {
+      console.warn('Unable to refresh rotated push token:', error);
+    });
+    const unsubscribeResponses = subscribeToNotificationResponses((response) => {
+      void handleNotificationResponse(response);
+    });
+    const unsubscribeForeground = subscribeToForegroundNotifications((notification) => {
+      const conversationId = getConversationIdFromNotification(notification);
+      emitConversationActivity({ type: 'message', conversationId: conversationId ?? undefined });
+      scheduleBadgeSync();
+    });
+
+    void getLastNotificationResponse()
+      .then((response) => {
+        if (response) void handleNotificationResponse(response);
+      })
+      .catch((error) => console.warn('Unable to read launch notification:', error));
+
+    scheduleBadgeSync();
+
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      void registerForPushNotifications().catch((error) => {
+        console.warn('Unable to refresh push registration:', error);
+      });
+      scheduleBadgeSync();
+    });
+
+    const unsubscribeConversationActivity = subscribeToConversationActivity(() => {
+      scheduleBadgeSync();
+    });
+
+    return () => {
+      unsubscribeTokenChanges();
+      unsubscribeResponses();
+      unsubscribeForeground();
+      unsubscribeConversationActivity();
+      appStateSubscription.remove();
+      if (badgeTimerRef.current) {
+        clearTimeout(badgeTimerRef.current);
+        badgeTimerRef.current = null;
+      }
+    };
+  }, [handleNotificationResponse, scheduleBadgeSync, user?.id]);
+
+  return null;
+}

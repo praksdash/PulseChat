@@ -1,7 +1,7 @@
 # PulseChat Project State
 
 ## Current phase
-Phase 14 — Group chats
+Phase 15 — push notifications
 
 ## Completed
 - Phase 0 product scope/architecture
@@ -18,46 +18,63 @@ Phase 14 — Group chats
 - Phase 11 typing/presence/last seen
 - Phase 12 secure image messaging
 - Phase 13 reply/edit/delete/reactions
-- Phase 14 group chats packaged; migration/device verification required
+- Phase 14 group chats
+- Phase 15 implementation packaged; Firebase/EAS credentials, Edge Function deployment, Database Webhook and two-device verification required
 
-## Phase 14 implementation
-- transactional `create_group_conversation()` RPC
-- group owner/admin/member roles
-- secure member enumeration
-- admin add/remove member operations
-- owner promote/demote admin operations
-- ownership transfer
-- non-owner leave-group flow
-- 100-member prototype safety limit
-- group avatar Storage bucket with admin-only write RLS
-- validated group metadata RPC; direct client metadata update privilege revoked
-- group rows in Chats with title/avatar/member count/unread state
-- group sender name in chat-list preview
-- group conversation header with member count
-- incoming group message sender name + avatar
-- reply preview preserves group sender identity
-- Phase 10 receipt model reused for per-recipient group delivered/read state
-- membership changes refresh affected users through private `user:<uuid>` Broadcasts
-- removed users are redirected out of an open group in the official client
+## Phase 15 implementation
+- `expo-notifications` SDK 57 integration
+- Android `messages` notification channel
+- permission request + ExpoPushToken acquisition using EAS `projectId`
+- per-installation token registration in `public.push_tokens`
+- token rotation reconciliation
+- sign-out token disable + native unregister
+- server-only `push_delivery_log` idempotency ledger
+- `send-message-push` Supabase Edge Function
+- authenticated Database Webhook using a dedicated shared secret header
+- Expo Push Service enhanced-security access token support
+- new-message notifications for direct and group conversations
+- text/photo/generic media notification previews
+- conversation mute (`muted_until`) respected by dispatcher
+- sender excluded from push recipients
+- multi-device support per recipient
+- 100-token Expo batching
+- immediate invalid-token disable on `DeviceNotRegistered` ticket errors
+- notification badge count from durable unread receipts
+- foreground suppression while the exact conversation is open
+- notification tap opens the exact direct/group conversation
+- membership re-check before notification navigation
+- cold-start notification response handling
 
 ## Migration
-`supabase/migrations/202608150012_phase14_group_chats.sql`
+`supabase/migrations/202608160013_phase15_push_notifications.sql`
+
+## Edge Function
+`supabase/functions/send-message-push/index.ts`
 
 ## Verification
-`supabase/phase14_verify.sql`
+`supabase/phase15_verify.sql`
 
-## Environment variables
+## Required external configuration
+- Firebase Android app for `com.prakashdash.pulsechat`
+- project-root `google-services.json`
+- FCM V1 service-account credential uploaded to EAS
+- Expo access token with Enhanced Push Security enabled
+- Supabase Edge Function secrets: `PUSH_WEBHOOK_SECRET`, `EXPO_ACCESS_TOKEN`
+- Database Webhook: `public.messages` → INSERT → `send-message-push`
+
+## Client environment variables
 - `EXPO_PUBLIC_SUPABASE_URL`
 - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
 ## Known limitations
-- Group avatar objects are public-read like profile avatars; write/update/delete remains admin-authorized.
-- Group typing indicators are intentionally deferred; Phase 11 typing remains direct-chat only.
-- A malicious already-connected removed client may retain an authorized Realtime socket until channel rejoin; durable database/RPC access is revoked immediately. The official PulseChat client disconnects by leaving the route as soon as its private membership event arrives. Security hardening is revisited in Phase 21.
-- Group media currently supports the existing Phase 12 image flow; video/audio/document composer flows remain deferred.
+- Phase 15 sends notifications for newly inserted messages only; edits/deletes/reactions do not create a second push.
+- Expo push receipts are not polled asynchronously yet; immediate ticket failures are logged/handled. Receipt polling and operational alerting belong in Phase 26 hardening.
+- Notification preference/mute UI is deferred to Phase 18; the dispatcher already honors `conversation_members.muted_until` if set.
+- iOS client code is included, but iOS credentials/device testing remain part of the later iOS production phase.
 
 ## Git checkpoint
-`feat: add group chats and member administration`
+`feat: add secure push notifications`
 
 ## Next task
-Phase 15 — push notifications.
+Phase 16 — search.
+- Phase 15 hotfix: Android notification channel no longer passes `sound: "default"` as a custom sound filename; system notification sound behavior is used instead.

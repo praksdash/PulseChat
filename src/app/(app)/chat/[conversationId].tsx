@@ -34,6 +34,7 @@ import { subscribeToGroupMembershipEvents } from '@/services/group-membership-ev
 import { getGroupAvatarPublicUrl } from '@/services/group-service';
 import { chooseChatImageFromLibrary, takeChatPhoto } from '@/services/media-service';
 import { MAX_TEXT_MESSAGE_LENGTH } from '@/services/message-service';
+import { setActivePushConversation } from '@/services/push-notification-service';
 import { getAvatarPublicUrl } from '@/services/profile-service';
 import { useAppTheme } from '@/theme';
 import type { ConversationSummary } from '@/types/conversation';
@@ -160,6 +161,14 @@ export default function ConversationScreen() {
     }, [loadSummary]),
   );
 
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!conversationId) return undefined;
+      setActivePushConversation(conversationId);
+      return () => setActivePushConversation(null);
+    }, [conversationId]),
+  );
 
   useEffect(() => subscribeToGroupMembershipEvents((event) => {
     if (!conversationId || event.conversationId !== conversationId) return;

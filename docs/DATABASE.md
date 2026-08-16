@@ -130,3 +130,19 @@ Group mutations use narrow authenticated RPCs rather than direct membership INSE
 The message projection now includes sender display name/avatar and reply-sender display name so group bubbles can identify incoming authors without exposing auth email data.
 
 Phase 10 receipt rows were already group-ready: every non-sender member receives one receipt row for messages created while they are a member. Removing/leaving a group deletes that user's receipt rows for the group so aggregate sender status reflects remaining recipients.
+
+## Phase 15 push notifications
+
+### `public.push_tokens`
+One row per Expo push token. Important fields: `user_id`, `expo_push_token`, `platform`, `device_name`, `app_version`, `enabled`, `last_registered_at`.
+
+Direct writes are denied. `register_my_push_token()` derives ownership from `auth.uid()` and safely moves a token to the currently authenticated account if the same installation changes account. `disable_my_push_token()` can disable only the caller's own token.
+
+### `public.push_delivery_log`
+Server-only idempotency/ticket ledger. `UNIQUE(message_id, expo_push_token)` prevents a Database Webhook retry from generating duplicate notifications for the same physical registration.
+
+### Service-only RPCs
+- `claim_push_deliveries(message_id, deliveries_json)` atomically claims only enabled token/recipient pairs that have a real message receipt.
+- `get_push_unread_counts(user_ids)` returns aggregate durable unread counts for notification badges.
+
+Clients cannot execute these two dispatcher RPCs.

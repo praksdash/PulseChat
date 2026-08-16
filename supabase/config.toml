@@ -1,0 +1,6 @@
+# Phase 15: Database Webhook calls this function with a shared secret header.
+# JWT verification is disabled at the gateway because this is a server-to-server
+# webhook. The function rejects requests unless x-pulsechat-webhook-secret
+# exactly matches the PUSH_WEBHOOK_SECRET Edge Function secret.
+[functions.send-message-push]
+verify_jwt = false

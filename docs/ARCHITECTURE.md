@@ -23,8 +23,11 @@ Expo / React Native / TypeScript
                  ├── Supabase Realtime Broadcast
                  │      ├── conversation:<uuid>
                  │      └── user:<uuid>
-                 └── Supabase Storage
-                        └── avatars
+                 ├── Supabase Storage
+                 │      ├── avatars / group-avatars
+                 │      └── private chat-media
+                 └── Supabase Edge Functions
+                        └── send-message-push → Expo Push Service → FCM/APNs
 ```
 
 ## Phase 10 message lifecycle
@@ -79,10 +82,9 @@ Receipt updates are broadcast as a monotonic `through_created_at` cursor instead
 `message_receipts.read_at IS NULL` is the authoritative unread source. `conversation_members.last_read_at` is also maintained as a useful conversation read cursor for later query/UX features.
 
 ## Deferred
-- Phase 11: presence/typing/last seen
-- Phase 12: chat media
-- Phase 13: reply/edit/delete/reactions
-- Phase 14: group UI/admin semantics
+- Phase 16+: search and the remaining product-hardening roadmap
+- Phase 18: user-facing notification/mute settings
+- Phase 26: asynchronous Expo push-receipt polling/monitoring
 
 ## Phase 12 image send flow
 
@@ -142,3 +144,35 @@ Groups reuse the same durable messaging path as direct chats:
 `group creator → create_group_conversation RPC → conversations(kind=group) + conversation_members → private conversation Realtime → messages/receipts/attachments`
 
 Member administration is server-authoritative. The client never inserts/deletes membership rows directly. Group message history uses the same pagination, media, reply/edit/delete/reaction, receipt and Realtime infrastructure as direct chats, with an expanded authorized projection for sender identity.
+
+## Phase 15 push architecture
+
+```text
+sender inserts public.messages
+        ↓
+PostgreSQL commits message + recipient receipts
+        ↓
+Supabase Database Webhook (INSERT only)
+        ↓  x-pulsechat-webhook-secret
+send-message-push Edge Function
+        ↓
+load current conversation members + mute state
+        ↓
+load enabled public.push_tokens
+        ↓
+claim_push_deliveries(message, recipients)
+        ↓  unique(message_id, expo_push_token)
+Expo Push Service
+        ↓
+FCM / APNs
+        ↓
+recipient OS notification
+        ↓ tap
+PulseChat validates current membership
+        ↓
+/chat/<conversation UUID>
+```
+
+The sender never supplies recipient push tokens and the client never receives the server credential. Push is a server-side consequence of a durable message insert. The Database Webhook is protected by `PUSH_WEBHOOK_SECRET`; the Edge Function uses Supabase's server-only service-role environment and an Expo access token.
+
+Foreground delivery deliberately suppresses the OS banner when the user already has that exact conversation focused. Realtime remains responsible for the live in-app message UI; push is the background/terminated transport.

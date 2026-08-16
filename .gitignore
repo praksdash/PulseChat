@@ -38,3 +38,11 @@ yarn-error.*
 
 # TypeScript
 *.tsbuildinfo
+
+# Firebase / push service credentials (private service-account keys)
+*firebase-admin*.json
+*service-account*.json
+fcm-service-account*.json
+
+# Supabase CLI local state
+.supabase/

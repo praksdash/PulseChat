@@ -18,7 +18,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.prakashdash.pulsechat"
+      "package": "com.prakashdash.pulsechat",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
@@ -26,6 +27,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-notifications",
+        {
+          "color": "#208AEF",
+          "defaultChannel": "messages"
+        }
+      ],
       [
         "expo-splash-screen",
         {

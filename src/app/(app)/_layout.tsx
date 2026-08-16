@@ -1,6 +1,8 @@
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 
+import { PushNotificationBridge } from '@/components/auth';
+
 import { useAuth } from '@/hooks/use-auth';
 import { subscribeToUserInbox } from '@/services/inbox-realtime-service';
 import { subscribeToOwnPresence } from '@/services/presence-service';
@@ -21,7 +23,9 @@ export default function AppLayout() {
   }, [user?.id]);
 
   return (
-    <Stack
+    <>
+      <PushNotificationBridge />
+      <Stack
       initialRouteName="(tabs)"
       screenOptions={{
         headerShown: false,
@@ -33,6 +37,7 @@ export default function AppLayout() {
       <Stack.Screen name="users/[userId]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="groups/new" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="groups/[conversationId]" options={{ animation: 'slide_from_right' }} />
-    </Stack>
+      </Stack>
+    </>
   );
 }

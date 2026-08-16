@@ -98,3 +98,18 @@ Returns the authorized Phase 13 message projection used after mutation Broadcast
 - `update_group_profile(conversation_id, title, avatar_path)`
 
 No RPC accepts an acting-user ID; authorization always derives the actor from `auth.uid()`.
+
+## Phase 15 RPC/API surface
+
+### Authenticated client RPCs
+`register_my_push_token(target_expo_push_token, target_platform, target_device_name, target_app_version)` registers/reassigns the current installation to `auth.uid()`.
+
+`disable_my_push_token(target_expo_push_token)` disables only the caller-owned registration.
+
+### Server-only RPCs
+`claim_push_deliveries(target_message_id, target_deliveries)` atomically deduplicates push work.
+
+`get_push_unread_counts(target_user_ids)` supplies per-user badge counts to the Edge Function.
+
+### Edge Function
+`send-message-push` accepts only the Supabase Database Webhook POST payload for `public.messages` INSERT and requires the private `x-pulsechat-webhook-secret` header.

@@ -68,3 +68,14 @@ Phase 21 will add rate limiting/abuse review, block/report enforcement, deletion
 - Direct update privilege for group title/avatar is revoked; `update_group_profile()` validates role and Storage path.
 - `group-avatars` is public-read for display parity with profile avatars, but object writes/deletes require an owner/admin membership check against the conversation UUID in the object path.
 - Message/RPC access still requires active conversation membership.
+
+## Phase 15 push security
+- Expo push tokens are stored separately from public profile data and are readable only by their owner; direct writes are revoked.
+- Registration and disable RPCs derive the actor from `auth.uid()`.
+- The sender never chooses push recipients; the Edge Function derives recipients from current `conversation_members` and message receipts.
+- The Edge Function is invoked by a Database Webhook carrying `x-pulsechat-webhook-secret`; requests without the matching secret are rejected.
+- `SUPABASE_SERVICE_ROLE_KEY`/secret keys remain only inside Supabase Edge Functions and must never be copied into `.env` used by the React Native client.
+- `EXPO_ACCESS_TOKEN` is a server secret and is required by the dispatcher; enable Expo Enhanced Push Security.
+- Firebase service-account JSON is private and is ignored by repository patterns. `google-services.json` contains client Firebase identifiers and is used by the Android build.
+- A notification tap does not blindly trust payload data: PulseChat calls the authorized conversation-summary RPC before navigating, so a user removed from a group cannot reopen it from an old notification.
+- Sign-out disables the stored server token and unregisters the native push installation.

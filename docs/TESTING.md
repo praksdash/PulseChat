@@ -109,3 +109,18 @@ Typing/presence is Phase 11; media is Phase 12.
 12. Account outside the group cannot call `list_group_members`, message-history RPCs, or group-management RPCs successfully.
 13. Run `supabase/phase14_verify.sql`; malformed-owner and oversized-group queries return 0 rows.
 14. Regression: direct chats, image messages, replies, edits, deletes, reactions, receipts and direct typing/presence still work.
+
+## Phase 15 push-notification manual tests
+
+1. Run `supabase/phase15_verify.sql`; both push tables must have RLS enabled, anon cannot register, authenticated clients cannot claim server deliveries.
+2. On each Android test installation, login and allow notification permission. Confirm an enabled row appears in `public.push_tokens` for that account.
+3. Keep B on the Chats screen/backgrounded; A sends a direct text. B receives one notification with A's display name and text preview.
+4. Tap B's notification. PulseChat opens the exact A/B conversation and durable unread/read state reconciles.
+5. Background/terminate B, send another A→B message, and verify the OS still presents it. (Do not Android force-stop the app from Settings; that disables delivery until reopened.)
+6. Keep B actively focused inside the A/B conversation while A sends. The live Realtime bubble appears but the duplicate foreground OS banner is suppressed.
+7. Create A/B/C group. A sends one message. B and C each receive a group notification whose title is the group name and body begins with A's display name.
+8. Send one photo. Receiver notification shows a photo preview label/caption and opens the correct chat.
+9. Retry the same Database Webhook/message: `push_delivery_log` unique `(message_id, expo_push_token)` must prevent a second push.
+10. Sign B out. B's token row becomes disabled and the native registration is unregistered; messages to B must not expose previews on the signed-out installation.
+11. Remove C from a group, then tap an older group notification on C. Membership re-check must refuse navigation.
+12. Verify message delivery/read ticks, Realtime, images, replies/edits/deletes/reactions and group administration still work.

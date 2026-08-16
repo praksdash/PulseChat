@@ -210,6 +210,84 @@ export type Database = {
         };
         Relationships: [];
       };
+      push_tokens: {
+        Row: {
+          id: string;
+          user_id: string;
+          expo_push_token: string;
+          platform: 'android' | 'ios';
+          device_name: string | null;
+          app_version: string | null;
+          enabled: boolean;
+          last_registered_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          expo_push_token: string;
+          platform: 'android' | 'ios';
+          device_name?: string | null;
+          app_version?: string | null;
+          enabled?: boolean;
+          last_registered_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          expo_push_token?: string;
+          platform?: 'android' | 'ios';
+          device_name?: string | null;
+          app_version?: string | null;
+          enabled?: boolean;
+          last_registered_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      push_delivery_log: {
+        Row: {
+          id: number;
+          message_id: string;
+          user_id: string;
+          expo_push_token: string;
+          status: 'claimed' | 'sent' | 'error';
+          ticket_id: string | null;
+          error_code: string | null;
+          error_message: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          message_id: string;
+          user_id: string;
+          expo_push_token: string;
+          status?: 'claimed' | 'sent' | 'error';
+          ticket_id?: string | null;
+          error_code?: string | null;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          message_id?: string;
+          user_id?: string;
+          expo_push_token?: string;
+          status?: 'claimed' | 'sent' | 'error';
+          ticket_id?: string | null;
+          error_code?: string | null;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       attachments: {
         Row: {
           id: string;
@@ -258,6 +336,19 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      register_my_push_token: {
+        Args: {
+          target_expo_push_token: string;
+          target_platform: string;
+          target_device_name?: string | null;
+          target_app_version?: string | null;
+        };
+        Returns: string;
+      };
+      disable_my_push_token: {
+        Args: { target_expo_push_token: string };
+        Returns: boolean;
+      };
       touch_my_last_seen: {
         Args: Record<string, never>;
         Returns: string;

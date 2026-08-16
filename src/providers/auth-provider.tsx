@@ -3,6 +3,8 @@ import { createContext, type PropsWithChildren, useCallback, useEffect, useMemo,
 import { AppState, Platform } from 'react-native';
 
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { registerForPushNotifications, resumePushRegistration, suspendPushRegistration, unregisterNativePushNotifications } from '@/services/push-notification-service';
+import { disableStoredExpoPushToken } from '@/services/push-token-service';
 import type { Profile } from '@/types/profile';
 import { getFriendlyAuthError } from '@/utils/auth-errors';
 
@@ -162,8 +164,29 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const signOut = useCallback(async () => {
     if (!isSupabaseConfigured) return missingConfigurationMessage;
 
+    suspendPushRegistration();
+
+    try {
+      await disableStoredExpoPushToken();
+    } catch (pushError) {
+      console.warn('Unable to disable push token during sign out:', pushError);
+    }
+
+    try {
+      // Even if the database call above could not reach the network, unregister
+      // the native installation so a signed-out device does not keep receiving
+      // chat previews for the previous account.
+      await unregisterNativePushNotifications();
+    } catch (nativePushError) {
+      console.warn('Unable to unregister native push notifications:', nativePushError);
+    }
+
     const { error } = await supabase.auth.signOut({ scope: 'local' });
-    if (error) return getFriendlyAuthError(error);
+    if (error) {
+      resumePushRegistration();
+      void registerForPushNotifications().catch(() => undefined);
+      return getFriendlyAuthError(error);
+    }
 
     setSession(null);
     setProfile(null);
