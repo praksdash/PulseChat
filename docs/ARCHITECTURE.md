@@ -134,3 +134,11 @@ Edit/delete also fan out a minimal `inbox_message_changed` event to private `use
 Replies use the existing `(reply_to_message_id, conversation_id)` foreign key, guaranteeing that a reply cannot target another conversation.
 
 Deleted image messages remove attachment metadata and are no longer eligible for new Storage signed URLs. Physical object deletion is then attempted by the sender client under uploader-only Storage RLS.
+
+## Phase 14 group architecture
+
+Groups reuse the same durable messaging path as direct chats:
+
+`group creator → create_group_conversation RPC → conversations(kind=group) + conversation_members → private conversation Realtime → messages/receipts/attachments`
+
+Member administration is server-authoritative. The client never inserts/deletes membership rows directly. Group message history uses the same pagination, media, reply/edit/delete/reaction, receipt and Realtime infrastructure as direct chats, with an expanded authorized projection for sender identity.

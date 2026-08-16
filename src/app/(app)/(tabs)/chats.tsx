@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, AppIcon, AppText, ChatRow, type ChatRowModel, EmptyState, SearchBar } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
+import { getGroupAvatarPublicUrl } from '@/services/group-service';
 import { getAvatarPublicUrl } from '@/services/profile-service';
 import { listMyConversations } from '@/services/conversation-service';
 import { subscribeToConversationActivity } from '@/services/conversation-events';
@@ -51,8 +52,12 @@ function toChatRow(item: ConversationListItem, currentUserId: string | undefined
   return {
     id: item.conversation_id,
     name: item.display_name,
-    avatarUri: getAvatarPublicUrl(item.avatar_path),
-    preview: item.last_message_preview ?? 'No messages yet — say hello.',
+    avatarUri: item.kind === 'group'
+      ? getGroupAvatarPublicUrl(item.avatar_path)
+      : getAvatarPublicUrl(item.avatar_path),
+    preview: item.kind === 'group' && item.last_message_sender_id !== currentUserId && item.last_message_sender_name
+      ? `${item.last_message_sender_name}: ${item.last_message_preview ?? 'Message'}`
+      : (item.last_message_preview ?? 'No messages yet — say hello.'),
     time: formatConversationTime(item.last_message_created_at ?? item.last_activity_at),
     sentByMe: hasLastMessage && item.last_message_sender_id === currentUserId,
     unread: item.unread_count ?? 0,
@@ -118,6 +123,10 @@ export default function ChatsScreen() {
 
   const openDiscovery = () => {
     router.push('/search');
+  };
+
+  const openGroupCreator = () => {
+    router.push('/groups/new');
   };
 
   const renderContent = () => {
@@ -208,20 +217,36 @@ export default function ChatsScreen() {
               : (conversations.length === 1 ? '1 conversation' : `${conversations.length} conversations`)}
           </AppText>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Start a new conversation"
-          onPress={openDiscovery}
-          style={({ pressed }) => [
-            styles.headerButton,
-            { backgroundColor: pressed ? theme.colors.surfaceMuted : theme.colors.primarySoft },
-          ]}>
-          <AppIcon
-            name={{ ios: 'square.and.pencil', android: 'edit_square', web: 'edit_square' }}
-            size={22}
-            color={theme.colors.primary}
-          />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Create group"
+            onPress={openGroupCreator}
+            style={({ pressed }) => [
+              styles.headerButton,
+              { backgroundColor: pressed ? theme.colors.surfaceMuted : theme.colors.primarySoft },
+            ]}>
+            <AppIcon
+              name={{ ios: 'person.3.fill', android: 'group_add', web: 'group_add' }}
+              size={22}
+              color={theme.colors.primary}
+            />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Start a new direct conversation"
+            onPress={openDiscovery}
+            style={({ pressed }) => [
+              styles.headerButton,
+              { backgroundColor: pressed ? theme.colors.surfaceMuted : theme.colors.primarySoft },
+            ]}>
+            <AppIcon
+              name={{ ios: 'square.and.pencil', android: 'edit_square', web: 'edit_square' }}
+              size={22}
+              color={theme.colors.primary}
+            />
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.searchWrap}>
@@ -255,6 +280,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerButton: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   searchWrap: { paddingHorizontal: 16, paddingBottom: 12 },
   inlineError: { marginHorizontal: 16, marginBottom: 10, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },

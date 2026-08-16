@@ -22,6 +22,7 @@ export type MessageReactionSummary = {
 export type ReplyPreview = {
   messageId: string;
   senderId: string | null;
+  senderDisplayName?: string | null;
   messageType: Message['message_type'];
   body: string | null;
   deletedAt: string | null;
@@ -48,6 +49,8 @@ export type PendingImageAsset = {
 };
 
 export type ChatMessage = Message & {
+  senderDisplayName?: string | null;
+  senderAvatarPath?: string | null;
   isOptimistic?: boolean;
   localState?: MessageLocalState;
   attachment?: ChatAttachment | null;

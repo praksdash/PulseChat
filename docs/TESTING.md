@@ -92,3 +92,20 @@ Typing/presence is Phase 11; media is Phase 12.
 12. Changing reaction replaces the prior reaction for that user.
 13. Close/reopen app; edits/deletes/reactions/replies persist.
 14. Edit/delete the latest message while peer is on Chats tab; preview refreshes.
+
+## Phase 14 group-chat manual tests
+
+1. Login as A, search/select B and C, create a named group.
+2. A/B/C Chats screens show one group row; no duplicate group is created by UI retries.
+3. A sends text and image; B/C receive them realtime.
+4. Incoming group bubbles show the sender's name/avatar.
+5. B and C read the message; A's receipt advances according to all recipient receipts.
+6. A promotes B to admin; B can add/remove regular members but cannot remove A or change admin roles.
+7. A demotes B; B immediately loses admin management ability on reload/event.
+8. A removes C; C's official client leaves the group route and the group disappears from Chats.
+9. A transfers ownership to B; A becomes admin, B becomes owner.
+10. A (now admin) leaves the group successfully.
+11. Change group title/avatar; all members see the updated Chats row after private membership/activity refresh.
+12. Account outside the group cannot call `list_group_members`, message-history RPCs, or group-management RPCs successfully.
+13. Run `supabase/phase14_verify.sql`; malformed-owner and oversized-group queries return 0 rows.
+14. Regression: direct chats, image messages, replies, edits, deletes, reactions, receipts and direct typing/presence still work.

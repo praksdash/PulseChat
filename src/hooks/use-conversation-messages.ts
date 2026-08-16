@@ -54,7 +54,10 @@ function toMessageRecord(message: ServerMessage): Message {
     attachment_height: _attachmentHeight,
     attachment_duration_ms: _attachmentDurationMs,
     signed_media_url: _signedMediaUrl,
+    sender_display_name: _senderDisplayName,
+    sender_avatar_path: _senderAvatarPath,
     reply_sender_id: _replySenderId,
+    reply_sender_display_name: _replySenderDisplayName,
     reply_message_type: _replyMessageType,
     reply_body: _replyBody,
     reply_deleted_at: _replyDeletedAt,
@@ -95,6 +98,7 @@ function getReplyPreview(message: ServerMessage): ReplyPreview | null {
   return {
     messageId: row.reply_to_message_id,
     senderId: row.reply_sender_id ?? null,
+    senderDisplayName: row.reply_sender_display_name ?? null,
     messageType: row.reply_message_type,
     body: row.reply_body ?? null,
     deletedAt: row.reply_deleted_at ?? null,
@@ -126,6 +130,8 @@ function normalizeServerMessage(message: ServerMessage, currentUserId: string): 
 
   return {
     ...record,
+    senderDisplayName: row.sender_display_name ?? null,
+    senderAvatarPath: row.sender_avatar_path ?? null,
     isOptimistic: false,
     attachment,
     replyPreview: getReplyPreview(message),
@@ -230,6 +236,7 @@ function makeReplyPreview(message: ChatMessage): ReplyPreview {
   return {
     messageId: message.id,
     senderId: message.sender_id,
+    senderDisplayName: message.senderDisplayName ?? null,
     messageType: message.message_type,
     body: message.body,
     deletedAt: message.deleted_at,
@@ -327,7 +334,10 @@ export function useConversationMessages(
       conversationId,
       onMessage: (message) => {
         setMessages((current) => mergeServerMessage(current, message, currentUserId));
-        if (message.reply_to_message_id) void refreshOne(message.id);
+        // INSERT broadcasts carry only the raw messages row. Fetch the
+        // authorized projection so group chats receive sender identity, media,
+        // reply and reaction metadata without waiting for a manual refresh.
+        void refreshOne(message.id);
         if (message.sender_id !== currentUserId) void markRead();
       },
       onReceiptState: (event) => {

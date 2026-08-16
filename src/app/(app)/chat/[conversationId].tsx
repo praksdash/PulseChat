@@ -1,5 +1,5 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -30,6 +30,8 @@ import { useConversationMessages } from '@/hooks/use-conversation-messages';
 import { usePeerPresence } from '@/hooks/use-peer-presence';
 import { useTypingIndicator } from '@/hooks/use-typing-indicator';
 import { getConversationSummary } from '@/services/conversation-service';
+import { subscribeToGroupMembershipEvents } from '@/services/group-membership-events';
+import { getGroupAvatarPublicUrl } from '@/services/group-service';
 import { chooseChatImageFromLibrary, takeChatPhoto } from '@/services/media-service';
 import { MAX_TEXT_MESSAGE_LENGTH } from '@/services/message-service';
 import { getAvatarPublicUrl } from '@/services/profile-service';
@@ -152,12 +154,26 @@ export default function ConversationScreen() {
     }
   }, [conversationId]);
 
-  useEffect(() => {
+  useFocusEffect(
+    useCallback(() => {
+      void loadSummary();
+    }, [loadSummary]),
+  );
+
+
+  useEffect(() => subscribeToGroupMembershipEvents((event) => {
+    if (!conversationId || event.conversationId !== conversationId) return;
+    if (event.changeType === 'removed' || event.changeType === 'left') {
+      router.replace('/chats');
+      return;
+    }
     void loadSummary();
-  }, [loadSummary]);
+  }), [conversationId, loadSummary]);
 
   const name = summary?.display_name ?? fallbackName ?? 'Conversation';
-  const avatarUri = getAvatarPublicUrl(summary?.avatar_path);
+  const avatarUri = summary?.kind === 'group'
+    ? getGroupAvatarPublicUrl(summary.avatar_path)
+    : getAvatarPublicUrl(summary?.avatar_path);
   const normalizedDraft = draft.trim();
   const originalEditBody = editingMessage?.body?.trim() ?? '';
   const canSaveEdit = Boolean(
@@ -176,7 +192,9 @@ export default function ConversationScreen() {
     if (isDirectConversation && peerTyping) return 'typing…';
     if (isDirectConversation && peerPresence.online) return 'online';
     if (isDirectConversation) return formatLastSeen(peerPresence.lastSeenAt);
-    return summary?.kind === 'group' ? 'group' : (summary?.username ? `@${summary.username}` : 'direct chat');
+    return summary?.kind === 'group'
+      ? `${summary.member_count} member${summary.member_count === 1 ? '' : 's'}`
+      : (summary?.username ? `@${summary.username}` : 'direct chat');
   }, [
     isDirectConversation,
     peerPresence.lastSeenAt,
@@ -184,6 +202,7 @@ export default function ConversationScreen() {
     peerTyping,
     realtimeState,
     summary?.kind,
+    summary?.member_count,
     summary?.username,
   ]);
 
@@ -311,7 +330,26 @@ export default function ConversationScreen() {
   const replyLabel = (reply: ReplyPreview | null | undefined) => {
     if (!reply) return null;
     if (reply.senderId === user?.id) return 'You';
+    if (summary?.kind === 'group') return reply.senderDisplayName ?? 'Group member';
     return name;
+  };
+
+  const frameGroupIncoming = (item: ChatMessage, content: ReactNode) => {
+    const outgoing = item.sender_id === user?.id;
+    if (summary?.kind !== 'group' || outgoing) return content;
+
+    const senderName = item.senderDisplayName ?? 'Group member';
+    return (
+      <View style={styles.groupIncomingRow}>
+        <Avatar name={senderName} uri={getAvatarPublicUrl(item.senderAvatarPath)} size={28} />
+        <View style={styles.groupIncomingContent}>
+          <AppText variant="micro" tone="primary" numberOfLines={1} style={styles.groupSenderName}>
+            {senderName}
+          </AppText>
+          {content}
+        </View>
+      </View>
+    );
   };
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
@@ -320,16 +358,15 @@ export default function ConversationScreen() {
     const repliedToText = item.replyPreview ? getReplyText(item.replyPreview) : null;
 
     if (item.deleted_at) {
-      return (
-        <View style={styles.messageRow}>
-          <MessageBubble
-            text="Message deleted"
-            time={formatMessageTime(item.created_at)}
-            outgoing={outgoing}
-            status={outgoing ? (item.localState ?? 'sent') : undefined}
-          />
-        </View>
+      const bubble = (
+        <MessageBubble
+          text="Message deleted"
+          time={formatMessageTime(item.created_at)}
+          outgoing={outgoing}
+          status={outgoing ? (item.localState ?? 'sent') : undefined}
+        />
       );
+      return <View style={styles.messageRow}>{frameGroupIncoming(item, bubble)}</View>;
     }
 
     if (item.message_type === 'image') {
@@ -337,8 +374,7 @@ export default function ConversationScreen() {
       const width = item.attachment?.width ?? item.pendingImageAsset?.width ?? null;
       const height = item.attachment?.height ?? item.pendingImageAsset?.height ?? null;
 
-      return (
-        <View style={styles.messageRow}>
+      const bubble = (
           <MediaMessageBubble
             uri={mediaUri}
             width={width}
@@ -358,29 +394,28 @@ export default function ConversationScreen() {
             onOpen={mediaUri ? () => setViewer({ uri: mediaUri, caption: item.body }) : undefined}
             onRetry={item.localState === 'failed' ? () => retryMessage(item.client_message_id) : undefined}
           />
-        </View>
       );
+      return <View style={styles.messageRow}>{frameGroupIncoming(item, bubble)}</View>;
     }
 
     const body = item.body ?? (item.message_type === 'file' ? 'File' : 'Message');
-    return (
-      <View style={styles.messageRow}>
-        <MessageBubble
-          text={body}
-          time={formatMessageTime(item.created_at)}
-          outgoing={outgoing}
-          status={outgoing ? (item.localState ?? 'sent') : undefined}
-          edited={Boolean(item.edited_at)}
-          replySenderLabel={repliedToLabel}
-          replyText={repliedToText}
-          reactions={item.reactions}
-          myReaction={item.myReaction}
-          onReactionPress={(emoji) => void toggleReaction(item.id, emoji)}
-          onLongPress={() => openMessageActions(item)}
-          onRetry={item.localState === 'failed' ? () => retryMessage(item.client_message_id) : undefined}
-        />
-      </View>
+    const bubble = (
+      <MessageBubble
+        text={body}
+        time={formatMessageTime(item.created_at)}
+        outgoing={outgoing}
+        status={outgoing ? (item.localState ?? 'sent') : undefined}
+        edited={Boolean(item.edited_at)}
+        replySenderLabel={repliedToLabel}
+        replyText={repliedToText}
+        reactions={item.reactions}
+        myReaction={item.myReaction}
+        onReactionPress={(emoji) => void toggleReaction(item.id, emoji)}
+        onLongPress={() => openMessageActions(item)}
+        onRetry={item.localState === 'failed' ? () => retryMessage(item.client_message_id) : undefined}
+      />
     );
+    return <View style={styles.messageRow}>{frameGroupIncoming(item, bubble)}</View>;
   };
 
   const renderMessages = () => {
@@ -447,7 +482,9 @@ export default function ConversationScreen() {
   const contextTitle = editingMessage
     ? (editingMessage.message_type === 'image' ? 'Edit photo caption' : 'Edit message')
     : replyTarget
-      ? `Replying to ${replyTarget.sender_id === user?.id ? 'yourself' : name}`
+      ? `Replying to ${replyTarget.sender_id === user?.id
+        ? 'yourself'
+        : (summary?.kind === 'group' ? (replyTarget.senderDisplayName ?? 'group member') : name)}`
       : null;
   const contextText = contextMessage ? getReplyText(contextMessage) : null;
 
@@ -474,7 +511,13 @@ export default function ConversationScreen() {
             <AppText variant="micro" tone="secondary">{headerSubtitle}</AppText>
           </View>
         </View>
-        <Pressable accessibilityLabel="Conversation options" hitSlop={10} style={styles.roundButton}>
+        <Pressable
+          accessibilityLabel={summary?.kind === 'group' ? 'Open group info' : 'Conversation options'}
+          hitSlop={10}
+          onPress={summary?.kind === 'group' && conversationId
+            ? () => router.push({ pathname: '/groups/[conversationId]', params: { conversationId } })
+            : undefined}
+          style={styles.roundButton}>
           <AppIcon name={{ ios: 'ellipsis', android: 'more_vert', web: 'more_vert' }} size={22} color={theme.colors.textSecondary} />
         </Pressable>
       </View>
@@ -644,6 +687,9 @@ const styles = StyleSheet.create({
   actionWidth: { width: '100%', maxWidth: 260 },
   messageListContent: { paddingHorizontal: 12, paddingVertical: 14 },
   messageRow: { paddingVertical: 3 },
+  groupIncomingRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 7, maxWidth: '92%' },
+  groupIncomingContent: { flex: 1, alignItems: 'flex-start', gap: 2 },
+  groupSenderName: { paddingLeft: 4, maxWidth: 220 },
   paginationLoader: { alignItems: 'center', justifyContent: 'center', paddingVertical: 16 },
   inlineError: { marginHorizontal: 10, marginBottom: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },
   composerContext: {

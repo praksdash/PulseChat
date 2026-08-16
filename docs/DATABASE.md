@@ -107,3 +107,26 @@ Allowed MVP reactions: 👍 ❤️ 😂 😮 😢 🙏.
 - `get_message_detail(message_id)` — one-row authorized projection for realtime reconciliation.
 
 `list_conversation_messages` now returns reply preview and aggregate reaction state with each row.
+
+## Phase 14 group chats
+
+Groups reuse the existing `conversations` + `conversation_members` model; there is no duplicate group-message table.
+
+- `conversations.kind = 'group'`
+- `conversations.title` stores the group name
+- `conversations.avatar_path` stores the `group-avatars` object path
+- `conversation_members.role` is `owner`, `admin`, or `member`
+
+Group mutations use narrow authenticated RPCs rather than direct membership INSERT/DELETE privileges:
+- `create_group_conversation`
+- `list_group_members`
+- `add_group_members`
+- `remove_group_member`
+- `set_group_member_role`
+- `transfer_group_ownership`
+- `leave_group_conversation`
+- `update_group_profile`
+
+The message projection now includes sender display name/avatar and reply-sender display name so group bubbles can identify incoming authors without exposing auth email data.
+
+Phase 10 receipt rows were already group-ready: every non-sender member receives one receipt row for messages created while they are a member. Removing/leaving a group deletes that user's receipt rows for the group so aggregate sender status reflects remaining recipients.

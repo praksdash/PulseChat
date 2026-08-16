@@ -58,3 +58,13 @@ Phase 21 will add rate limiting/abuse review, block/report enforcement, deletion
 - Deleted image attachment metadata is removed.
 - `chat-media` reads now require a live attachment linked to a non-deleted message; folder membership alone is no longer enough for reads.
 - Mutation broadcasts stay on private conversation/user topics governed by existing Realtime Authorization policies.
+
+## Phase 14 group security
+
+- Group membership changes are server-authoritative RPCs bound to `auth.uid()`.
+- Owner/admin authorization is checked in PostgreSQL, not inferred from UI state.
+- Admins can remove regular members only; only the owner can promote/demote admins or transfer ownership.
+- Direct table INSERT/DELETE privileges for `conversation_members` remain unavailable to mobile clients.
+- Direct update privilege for group title/avatar is revoked; `update_group_profile()` validates role and Storage path.
+- `group-avatars` is public-read for display parity with profile avatars, but object writes/deletes require an owner/admin membership check against the conversation UUID in the object path.
+- Message/RPC access still requires active conversation membership.

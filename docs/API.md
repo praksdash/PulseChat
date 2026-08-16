@@ -85,3 +85,16 @@ Null removes the caller's reaction.
 ### get_message_detail
 Input: `target_message_id`.
 Returns the authorized Phase 13 message projection used after mutation Broadcast events.
+
+## Phase 14 RPCs
+
+- `create_group_conversation(group_title, member_user_ids)` → group UUID
+- `list_group_members(conversation_id)` → safe public member projection
+- `add_group_members(conversation_id, user_ids)` → added count
+- `remove_group_member(conversation_id, user_id)`
+- `set_group_member_role(conversation_id, user_id, member|admin)`
+- `transfer_group_ownership(conversation_id, user_id)`
+- `leave_group_conversation(conversation_id)`
+- `update_group_profile(conversation_id, title, avatar_path)`
+
+No RPC accepts an acting-user ID; authorization always derives the actor from `auth.uid()`.

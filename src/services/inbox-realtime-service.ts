@@ -1,6 +1,7 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import { emitConversationActivity } from '@/services/conversation-events';
+import { emitGroupMembershipEvent } from '@/services/group-membership-events';
 import { markAllPendingDelivered, markConversationDelivered } from '@/services/receipt-service';
 import { supabase } from '@/lib/supabase';
 
@@ -78,6 +79,20 @@ export function subscribeToUserInbox(userId: string) {
               });
             }, 80);
             deliveryTimers.set(inboxMessage.conversationId, timer);
+          }
+        })
+        .on('broadcast', { event: 'group_membership_changed' }, (event: unknown) => {
+          const payload = extractPayload(event);
+          const conversationId = payload?.conversation_id;
+          const changeType = payload?.change_type;
+          if (disposed) return;
+
+          emitConversationActivity({
+            type: 'message',
+            conversationId: typeof conversationId === 'string' ? conversationId : undefined,
+          });
+          if (typeof conversationId === 'string' && typeof changeType === 'string') {
+            emitGroupMembershipEvent({ conversationId, changeType });
           }
         })
         .on('broadcast', { event: 'inbox_message_changed' }, (event: unknown) => {

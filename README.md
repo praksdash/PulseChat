@@ -3,9 +3,9 @@
 Telegram-inspired messaging application built with React Native, Expo Router, TypeScript and Supabase.
 
 ## Current milestone
-Phase 13 — reply, edit, delete and emoji reactions.
+Phase 14 — group chats and member administration.
 
-Implemented through Phase 13:
+Implemented through Phase 14:
 - Android Expo development build
 - navigation + reusable messenger design system
 - Supabase email/password auth + persisted sessions
@@ -25,13 +25,13 @@ Implemented through Phase 13:
 - sender-only message/caption editing
 - sender-only delete-for-everyone soft deletion
 - server-authoritative emoji reactions
+- real group creation with owner/admin/member roles
+- group member add/remove/promote/demote/ownership transfer
+- group sender names/avatars and group-aware receipts
 
-## Phase 13 interaction
-Long-press a durable, non-deleted message to open the message-actions sheet.
+## Phase 14 interaction
+Use the group button in Chats to create a group. Open the group header options to manage members, roles, name and picture.
 
-Supported reactions for the MVP:
-`👍 ❤️ 😂 😮 😢 🙏`
+See `PHASE14_README.txt` and `docs/PROJECT_STATE.md`.
 
-See `PHASE13_README.txt` and `docs/PROJECT_STATE.md`.
-
-Next: Phase 14 — group chats.
+Next: Phase 15 — push notifications.

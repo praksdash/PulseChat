@@ -31,6 +31,8 @@ export default function AppLayout() {
       <Stack.Screen name="chat/[conversationId]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="profile/edit" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="users/[userId]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="groups/new" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="groups/[conversationId]" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
 }

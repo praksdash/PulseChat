@@ -303,8 +303,11 @@ export type Database = {
           username: string | null;
           avatar_path: string | null;
           peer_user_id: string | null;
+          member_count: number;
+          my_role: 'member' | 'admin' | 'owner';
           last_message_preview: string | null;
           last_message_sender_id: string | null;
+          last_message_sender_name: string | null;
           last_message_created_at: string | null;
           last_activity_at: string;
           unread_count: number;
@@ -319,6 +322,8 @@ export type Database = {
           username: string | null;
           avatar_path: string | null;
           peer_user_id: string | null;
+          member_count: number;
+          my_role: 'member' | 'admin' | 'owner';
           created_at: string;
           last_activity_at: string;
         }>;
@@ -334,6 +339,8 @@ export type Database = {
           id: string;
           conversation_id: string;
           sender_id: string | null;
+          sender_display_name: string | null;
+          sender_avatar_path: string | null;
           client_message_id: string;
           message_type: 'text' | 'image' | 'video' | 'audio' | 'voice' | 'file' | 'system';
           body: string | null;
@@ -352,6 +359,7 @@ export type Database = {
           attachment_height: number | null;
           attachment_duration_ms: number | null;
           reply_sender_id: string | null;
+          reply_sender_display_name: string | null;
           reply_message_type: 'text' | 'image' | 'video' | 'audio' | 'voice' | 'file' | 'system' | null;
           reply_body: string | null;
           reply_deleted_at: string | null;
@@ -365,6 +373,8 @@ export type Database = {
           id: string;
           conversation_id: string;
           sender_id: string | null;
+          sender_display_name: string | null;
+          sender_avatar_path: string | null;
           client_message_id: string;
           message_type: 'text' | 'image' | 'video' | 'audio' | 'voice' | 'file' | 'system';
           body: string | null;
@@ -383,6 +393,7 @@ export type Database = {
           attachment_height: number | null;
           attachment_duration_ms: number | null;
           reply_sender_id: string | null;
+          reply_sender_display_name: string | null;
           reply_message_type: 'text' | 'image' | 'video' | 'audio' | 'voice' | 'file' | 'system' | null;
           reply_body: string | null;
           reply_deleted_at: string | null;
@@ -406,6 +417,8 @@ export type Database = {
           id: string;
           conversation_id: string;
           sender_id: string | null;
+          sender_display_name: string | null;
+          sender_avatar_path: string | null;
           client_message_id: string;
           message_type: 'text' | 'image' | 'video' | 'audio' | 'voice' | 'file' | 'system';
           body: string | null;
@@ -424,6 +437,7 @@ export type Database = {
           attachment_height: number | null;
           attachment_duration_ms: number | null;
           reply_sender_id: string | null;
+          reply_sender_display_name: string | null;
           reply_message_type: 'text' | 'image' | 'video' | 'audio' | 'voice' | 'file' | 'system' | null;
           reply_body: string | null;
           reply_deleted_at: string | null;
@@ -447,6 +461,47 @@ export type Database = {
       set_message_reaction: {
         Args: { target_message_id: string; target_emoji?: string | null };
         Returns: string | null;
+      };
+
+      create_group_conversation: {
+        Args: { group_title: string; member_user_ids?: string[] };
+        Returns: string;
+      };
+      list_group_members: {
+        Args: { target_conversation_id: string };
+        Returns: Array<{
+          user_id: string;
+          display_name: string;
+          username: string | null;
+          avatar_path: string | null;
+          role: 'member' | 'admin' | 'owner';
+          joined_at: string;
+          is_self: boolean;
+        }>;
+      };
+      add_group_members: {
+        Args: { target_conversation_id: string; new_user_ids: string[] };
+        Returns: number;
+      };
+      remove_group_member: {
+        Args: { target_conversation_id: string; target_user_id: string };
+        Returns: undefined;
+      };
+      set_group_member_role: {
+        Args: { target_conversation_id: string; target_user_id: string; target_role: 'member' | 'admin' };
+        Returns: undefined;
+      };
+      transfer_group_ownership: {
+        Args: { target_conversation_id: string; target_user_id: string };
+        Returns: undefined;
+      };
+      leave_group_conversation: {
+        Args: { target_conversation_id: string };
+        Returns: undefined;
+      };
+      update_group_profile: {
+        Args: { target_conversation_id: string; target_title: string; target_avatar_path?: string | null };
+        Returns: undefined;
       };
       get_my_total_unread_count: {
         Args: Record<string, never>;
