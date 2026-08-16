@@ -1,7 +1,7 @@
 # PulseChat Project State
 
 ## Current phase
-Phase 15 — push notifications
+Phase 16 — search
 
 ## Completed
 - Phase 0 product scope/architecture
@@ -19,7 +19,8 @@ Phase 15 — push notifications
 - Phase 12 secure image messaging
 - Phase 13 reply/edit/delete/reactions
 - Phase 14 group chats
-- Phase 15 implementation packaged; Firebase/EAS credentials, Edge Function deployment, Database Webhook and two-device verification required
+- Phase 15 push notifications + Android/web notification diagnostics
+- Phase 16 global search
 
 ## Phase 15 implementation
 - `expo-notifications` SDK 57 integration
@@ -76,5 +77,27 @@ Phase 15 — push notifications
 `feat: add secure push notifications`
 
 ## Next task
-Phase 16 — search.
+Phase 17 — block/report/privacy.
 - Phase 15 hotfix: Android notification channel no longer passes `sound: "default"` as a custom sound filename; system notification sound behavior is used instead.
+
+## Phase 15 notification completion fix
+- Profile > Notifications is now a real settings/diagnostics screen.
+- Android exposes permission, token registration, local test, and authenticated remote server test.
+- Web uses the browser Notification API for realtime alerts while the PulseChat tab is open/backgrounded.
+- Expo Notifications is native-only; closed-browser Web Push is intentionally not claimed in Phase 15.
+
+
+## Phase 16 implementation
+- Search tab now covers People / Chats / Messages / All.
+- `search_my_conversations()` is membership-scoped and searches direct peer names/usernames plus group titles.
+- `search_my_messages()` searches only non-deleted message bodies/image captions in conversations the caller currently belongs to.
+- `get_message_window()` securely returns a small timeline window around an old search hit for jump-to-message UX.
+- Message/group-title substring search uses pg_trgm GIN indexes.
+- Search results are debounced, paginated for messages, and stale responses cannot replace newer queries.
+- Tapping a message result opens the exact conversation, highlights the target, and provides Back to latest.
+
+## Migration
+`supabase/migrations/202608160014_phase16_search.sql`
+
+## Verification
+`supabase/phase16_verify.sql`

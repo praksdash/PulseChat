@@ -113,3 +113,9 @@ No RPC accepts an acting-user ID; authorization always derives the actor from `a
 
 ### Edge Function
 `send-message-push` accepts only the Supabase Database Webhook POST payload for `public.messages` INSERT and requires the private `x-pulsechat-webhook-secret` header.
+
+
+## Phase 16 search RPCs
+- `search_my_conversations(search_term, result_limit)` — authenticated chat search.
+- `search_my_messages(search_term, before_created_at, before_id, result_limit)` — authenticated message search with cursor pagination.
+- `get_message_window(focus_message_id, before_count, after_count)` — authorized context window for jump-to-message.

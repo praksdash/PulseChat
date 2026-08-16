@@ -1,16 +1,10 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import { emitConversationActivity } from '@/services/conversation-events';
+import { emitInboxMessage, type InboxMessageEvent } from '@/services/inbox-message-events';
 import { emitGroupMembershipEvent } from '@/services/group-membership-events';
 import { markAllPendingDelivered, markConversationDelivered } from '@/services/receipt-service';
 import { supabase } from '@/lib/supabase';
-
-type InboxMessageEvent = {
-  conversationId: string;
-  messageId: string;
-  senderId: string | null;
-  createdAt: string;
-};
 
 function extractPayload(event: unknown): Record<string, unknown> | null {
   if (!event || typeof event !== 'object') return null;
@@ -70,6 +64,7 @@ export function subscribeToUserInbox(userId: string) {
             type: 'message',
             conversationId: inboxMessage.conversationId,
           });
+          emitInboxMessage(inboxMessage);
 
           if (!deliveryTimers.has(inboxMessage.conversationId)) {
             const timer = setTimeout(() => {

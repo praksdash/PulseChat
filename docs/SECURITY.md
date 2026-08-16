@@ -79,3 +79,12 @@ Phase 21 will add rate limiting/abuse review, block/report enforcement, deletion
 - Firebase service-account JSON is private and is ignored by repository patterns. `google-services.json` contains client Firebase identifiers and is used by the Android build.
 - A notification tap does not blindly trust payload data: PulseChat calls the authorized conversation-summary RPC before navigating, so a user removed from a group cannot reopen it from an old notification.
 - Sign-out disables the stored server token and unregisters the native push installation.
+
+
+## Phase 16 search security
+- Message/chat search is performed through narrow authenticated RPCs; clients are not granted broad cross-conversation table reads.
+- Every conversation/message search result is constrained by a live `conversation_members` row for `auth.uid()`.
+- `get_message_window()` repeats the membership check before returning timeline context, so a stale search result cannot reopen a group after removal.
+- Deleted messages are excluded from `search_my_messages()`.
+- LIKE wildcard characters in caller input are escaped server-side and search length/result counts are bounded.
+- Search never returns auth email, phone, push token, or other private account metadata.

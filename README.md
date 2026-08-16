@@ -37,3 +37,7 @@ Implemented through Phase 14:
 Phase 15 requires Firebase FCM V1 credentials, `google-services.json`, the Supabase Edge Function and a Database Webhook. See `PHASE15_README.txt`, `docs/PROJECT_STATE.md` and the Phase 15 delivery instructions.
 
 Next: Phase 16 — search.
+
+
+### Phase 16
+Global authenticated search is available for people, direct/group chats and message text/image captions, including secure jump-to-message context.

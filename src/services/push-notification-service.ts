@@ -23,6 +23,10 @@ export function setActivePushConversation(conversationId: string | null) {
   activeConversationId = conversationId;
 }
 
+export function getActivePushConversation() {
+  return activeConversationId;
+}
+
 export function configurePushNotificationHandler() {
   if (Platform.OS === 'web' || notificationHandlerConfigured) return;
   notificationHandlerConfigured = true;
@@ -147,6 +151,80 @@ export async function getLastNotificationResponse() {
 export async function clearLastNotificationResponse() {
   if (Platform.OS === 'web') return;
   await Notifications.clearLastNotificationResponseAsync();
+}
+
+
+export type NativeNotificationStatus = {
+  supported: boolean;
+  permission: 'granted' | 'denied' | 'undetermined' | 'unsupported';
+  registeredDevices: number;
+  latestRegistrationAt: string | null;
+};
+
+export async function getNativeNotificationStatus(): Promise<NativeNotificationStatus> {
+  if (Platform.OS === 'web') {
+    return { supported: false, permission: 'unsupported', registeredDevices: 0, latestRegistrationAt: null };
+  }
+
+  const permissions = await Notifications.getPermissionsAsync();
+  const { data, error } = await supabase
+    .from('push_tokens')
+    .select('enabled,last_registered_at')
+    .eq('enabled', true)
+    .order('last_registered_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
+
+  const permission = permissions.status === 'granted'
+    ? 'granted'
+    : permissions.status === 'denied'
+      ? 'denied'
+      : 'undetermined';
+
+  return {
+    supported: true,
+    permission,
+    registeredDevices: data?.length ?? 0,
+    latestRegistrationAt: data?.[0]?.last_registered_at ?? null,
+  };
+}
+
+export async function sendLocalTestNotification() {
+  if (Platform.OS === 'web') throw new Error('Native test notifications are unavailable on web.');
+  configurePushNotificationHandler();
+  await ensureAndroidMessageChannel();
+
+  const permissions = await Notifications.getPermissionsAsync();
+  if (permissions.status !== 'granted') {
+    throw new Error('Notification permission is not granted.');
+  }
+
+  return Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'PulseChat test',
+      body: 'Notifications are enabled on this device.',
+      data: { type: 'test' },
+    },
+    trigger: null,
+  });
+}
+
+export async function sendRemoteTestNotification() {
+  if (Platform.OS === 'web') throw new Error('Remote Expo push tests are for Android/iOS devices.');
+  const registration = await registerForPushNotifications();
+  if (registration.status !== 'registered') {
+    throw new Error(registration.status === 'denied'
+      ? 'Notification permission is denied.'
+      : 'This device could not register for remote notifications.');
+  }
+
+  const { data, error } = await supabase.functions.invoke('send-message-push', {
+    body: { action: 'test' },
+  });
+
+  if (error) throw new Error(error.message);
+  if (!data?.ok) throw new Error(data?.error ?? 'Remote push test failed.');
+  return data as { ok: boolean; sent: number; errors: number; details?: string[] };
 }
 
 export async function unregisterNativePushNotifications() {

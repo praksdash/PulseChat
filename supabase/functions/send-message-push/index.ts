@@ -15,6 +15,7 @@ type MessageWebhookPayload = {
   table?: string;
   schema?: string;
   record?: WebhookMessageRecord | null;
+  action?: string;
 };
 
 type PushTokenRow = {
@@ -33,35 +34,33 @@ type ExpoPushTicket = {
 
 type ExpoPushMessage = {
   to: string;
-  sound: 'default';
+  sound?: 'default';
   title: string;
   body: string;
-  data: {
-    type: 'message';
-    conversationId: string;
-    messageId: string;
-    messageType: string;
-    conversationKind: 'direct' | 'group';
-  };
+  data?: Record<string, unknown>;
   badge?: number;
-  channelId: 'messages';
-  priority: 'high';
+  channelId?: 'messages';
+  priority?: 'high';
 };
 
 const EXPO_PUSH_ENDPOINT = 'https://exp.host/--/api/v2/push/send';
 const MAX_EXPO_BATCH = 100;
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-pulsechat-webhook-secret',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
   });
 }
 
 function getAdminKey() {
   const legacy = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (legacy) return legacy;
-
   const direct = Deno.env.get('SUPABASE_SECRET_KEY');
   if (direct) return direct;
 
@@ -72,11 +71,18 @@ function getAdminKey() {
       const firstSecret = Object.values(parsed).find((value) => typeof value === 'string' && value.length > 0);
       if (firstSecret) return firstSecret;
     } catch {
-      // The explicit configuration error below is more useful than leaking JSON details.
+      // Fall through to explicit configuration error.
     }
   }
 
   throw new Error('Supabase server secret is unavailable in this Edge Function.');
+}
+
+function getPublicKey() {
+  return Deno.env.get('SUPABASE_ANON_KEY')
+    ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY')
+    ?? Deno.env.get('SB_PUBLISHABLE_KEY')
+    ?? null;
 }
 
 function chunk<T>(values: T[], size: number) {
@@ -135,18 +141,117 @@ function getNotificationCopy(input: {
   return { title: input.senderName, body: preview };
 }
 
-async function dispatchMessage(messageId: string) {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  if (!supabaseUrl) throw new Error('SUPABASE_URL is unavailable.');
-
-  const admin = createClient(supabaseUrl, getAdminKey(), {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+async function postExpoMessages(messages: ExpoPushMessage[]) {
+  if (messages.length === 0) return [] as ExpoPushTicket[];
 
   const expoAccessToken = Deno.env.get('EXPO_ACCESS_TOKEN');
-  if (!expoAccessToken) {
-    throw new Error('EXPO_ACCESS_TOKEN is not configured for the Edge Function.');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Accept-Encoding': 'gzip, deflate',
+  };
+  if (expoAccessToken) headers.Authorization = `Bearer ${expoAccessToken}`;
+
+  const allTickets: ExpoPushTicket[] = [];
+  for (const batch of chunk(messages, MAX_EXPO_BATCH)) {
+    const response = await fetch(EXPO_PUSH_ENDPOINT, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(batch),
+    });
+
+    if (!response.ok) {
+      const responseText = (await response.text()).slice(0, 500);
+      throw new Error(`Expo Push Service HTTP ${response.status}: ${responseText}`);
+    }
+
+    const result = await response.json() as { data?: ExpoPushTicket[] };
+    const tickets = Array.isArray(result.data) ? result.data : [];
+    while (tickets.length < batch.length) {
+      tickets.push({ status: 'error', message: 'Expo Push Service returned no ticket.', details: { error: 'MISSING_TICKET' } });
+    }
+    allTickets.push(...tickets.slice(0, batch.length));
   }
+
+  return allTickets;
+}
+
+async function getAdminClient() {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  if (!supabaseUrl) throw new Error('SUPABASE_URL is unavailable.');
+  return createClient(supabaseUrl, getAdminKey(), {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+async function dispatchTestForAuthenticatedUser(req: Request) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const publicKey = getPublicKey();
+  const authorization = req.headers.get('Authorization');
+  if (!supabaseUrl || !publicKey || !authorization) {
+    return jsonResponse({ ok: false, error: 'Authenticated test request is missing credentials.' }, 401);
+  }
+
+  const authClient = createClient(supabaseUrl, publicKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: authorization } },
+  });
+  const { data: userData, error: userError } = await authClient.auth.getUser();
+  const user = userData.user;
+  if (userError || !user) {
+    return jsonResponse({ ok: false, error: 'Authentication required for a test notification.' }, 401);
+  }
+
+  const admin = await getAdminClient();
+  const { data: tokens, error: tokenError } = await admin
+    .from('push_tokens')
+    .select('expo_push_token')
+    .eq('user_id', user.id)
+    .eq('enabled', true);
+
+  if (tokenError) throw new Error(`Unable to load your push token: ${tokenError.message}`);
+  if (!tokens || tokens.length === 0) {
+    return jsonResponse({ ok: false, sent: 0, errors: 0, error: 'No enabled Expo push token is registered for this account.' }, 400);
+  }
+
+  const messages: ExpoPushMessage[] = tokens.map((row) => ({
+    to: row.expo_push_token,
+    sound: 'default',
+    title: 'PulseChat test',
+    body: 'Remote push is configured correctly for this device.',
+    data: { type: 'test' },
+    channelId: 'messages',
+    priority: 'high',
+  }));
+
+  const tickets = await postExpoMessages(messages);
+  let sent = 0;
+  let errors = 0;
+  const details: string[] = [];
+  const invalidTokens: string[] = [];
+
+  tickets.forEach((ticket, index) => {
+    if (ticket.status === 'ok') {
+      sent += 1;
+      return;
+    }
+    errors += 1;
+    const code = ticket.details?.error ?? 'EXPO_TICKET_ERROR';
+    details.push(`${code}: ${ticket.message ?? 'Push rejected.'}`);
+    if (code === 'DeviceNotRegistered') invalidTokens.push(tokens[index].expo_push_token);
+  });
+
+  if (invalidTokens.length > 0) {
+    await admin
+      .from('push_tokens')
+      .update({ enabled: false, updated_at: new Date().toISOString() })
+      .in('expo_push_token', invalidTokens);
+  }
+
+  return jsonResponse({ ok: errors === 0, sent, errors, details });
+}
+
+async function dispatchMessage(messageId: string) {
+  const admin = await getAdminClient();
 
   const { data: message, error: messageError } = await admin
     .from('messages')
@@ -222,7 +327,7 @@ async function dispatchMessage(messageId: string) {
 
   if (claimError) throw new Error(`Unable to claim push deliveries: ${claimError.message}`);
   const claimed = (claims ?? []) as PushClaimRow[];
-  if (claimed.length === 0) return { sent: 0, skipped: 'already dispatched' };
+  if (claimed.length === 0) return { sent: 0, skipped: 'already dispatched or already read' };
 
   const unreadByUser = new Map<string, number>();
   for (const row of unreadRows ?? []) {
@@ -272,23 +377,7 @@ async function dispatchMessage(messageId: string) {
     if (pushBatch.length === 0) continue;
 
     try {
-      const response = await fetch(EXPO_PUSH_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept-Encoding': 'gzip, deflate',
-          Authorization: `Bearer ${expoAccessToken}`,
-        },
-        body: JSON.stringify(pushBatch),
-      });
-
-      if (!response.ok) {
-        const responseText = (await response.text()).slice(0, 500);
-        throw new Error(`Expo Push Service HTTP ${response.status}: ${responseText}`);
-      }
-
-      const result = await response.json() as { data?: ExpoPushTicket[] };
-      const tickets = Array.isArray(result.data) ? result.data : [];
+      const tickets = await postExpoMessages(pushBatch);
       const updates = claimBatch.map((claim, index) => {
         const ticket = tickets[index];
         const ok = ticket?.status === 'ok';
@@ -344,13 +433,8 @@ async function dispatchMessage(messageId: string) {
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed.' }, 405);
-
-  const expectedSecret = Deno.env.get('PUSH_WEBHOOK_SECRET');
-  const suppliedSecret = req.headers.get('x-pulsechat-webhook-secret');
-  if (!expectedSecret || !suppliedSecret || suppliedSecret !== expectedSecret) {
-    return jsonResponse({ error: 'Unauthorized webhook.' }, 401);
-  }
 
   let payload: MessageWebhookPayload;
   try {
@@ -359,21 +443,32 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'Invalid JSON payload.' }, 400);
   }
 
-  if (
-    payload.type !== 'INSERT'
-    || payload.schema !== 'public'
-    || payload.table !== 'messages'
-    || !payload.record?.id
-  ) {
-    return jsonResponse({ ok: true, ignored: true });
-  }
-
   try {
+    if (payload.action === 'test') {
+      return await dispatchTestForAuthenticatedUser(req);
+    }
+
+    const expectedSecret = Deno.env.get('PUSH_WEBHOOK_SECRET');
+    const suppliedSecret = req.headers.get('x-pulsechat-webhook-secret');
+    if (!expectedSecret || !suppliedSecret || suppliedSecret !== expectedSecret) {
+      return jsonResponse({ error: 'Unauthorized webhook.' }, 401);
+    }
+
+    if (
+      payload.type !== 'INSERT'
+      || payload.schema !== 'public'
+      || payload.table !== 'messages'
+      || !payload.record?.id
+    ) {
+      return jsonResponse({ ok: true, ignored: true });
+    }
+
     const result = await dispatchMessage(payload.record.id);
     return jsonResponse({ ok: true, ...result });
   } catch (error) {
     console.error('PulseChat push dispatch failed:', error);
     return jsonResponse({
+      ok: false,
       error: error instanceof Error ? error.message : 'Push dispatch failed.',
     }, 500);
   }

@@ -10,6 +10,7 @@ import { sendImageMessage } from '@/services/media-service';
 import {
   createClientMessageId,
   getMessageDetail,
+  getMessageWindow,
   listConversationMessages,
   MESSAGE_PAGE_SIZE,
   sendTextMessage,
@@ -251,6 +252,7 @@ export function useConversationMessages(
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [isSearchWindow, setIsSearchWindow] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [realtimeState, setRealtimeState] = useState<RealtimeState>('connecting');
@@ -285,8 +287,9 @@ export function useConversationMessages(
     try {
       const page = await listConversationMessages(conversationId);
       if (!mountedRef.current) return;
-      setMessages((current) => mergeServerMessages(current, page, currentUserId));
+      setMessages(mergeServerMessages([], page, currentUserId));
       setHasMore(page.length >= MESSAGE_PAGE_SIZE);
+      setIsSearchWindow(false);
       void markRead();
     } catch (error) {
       console.warn('Unable to load messages:', error);
@@ -366,8 +369,39 @@ export function useConversationMessages(
     return () => subscription.remove();
   }, [refreshLatest]);
 
+  const loadMessageSearchWindow = useCallback(async (messageId: string) => {
+    if (!conversationId || !currentUserId || !messageId) return false;
+
+    setIsInitialLoading(true);
+    setLoadError(null);
+    try {
+      const windowRows = await getMessageWindow(messageId);
+      if (!mountedRef.current) return false;
+      if (windowRows.length === 0) {
+        setLoadError('This search result is no longer available.');
+        return false;
+      }
+
+      setMessages(mergeServerMessages([], windowRows, currentUserId));
+      setHasMore(false);
+      setIsSearchWindow(true);
+      void markRead();
+      return windowRows.some((row) => row.id === messageId);
+    } catch (error) {
+      console.warn('Unable to open message search result:', error);
+      if (mountedRef.current) setLoadError('Unable to open this search result right now.');
+      return false;
+    } finally {
+      if (mountedRef.current) setIsInitialLoading(false);
+    }
+  }, [conversationId, currentUserId, markRead]);
+
+  const exitMessageSearchWindow = useCallback(async () => {
+    await loadInitial();
+  }, [loadInitial]);
+
   const loadOlder = useCallback(async () => {
-    if (!conversationId || !currentUserId || isLoadingOlder || !hasMore) return;
+    if (!conversationId || !currentUserId || isLoadingOlder || !hasMore || isSearchWindow) return;
 
     const oldestServerMessage = [...messages].reverse().find((message) => !message.isOptimistic);
     if (!oldestServerMessage) {
@@ -391,7 +425,7 @@ export function useConversationMessages(
     } finally {
       if (mountedRef.current) setIsLoadingOlder(false);
     }
-  }, [conversationId, currentUserId, hasMore, isLoadingOlder, messages]);
+  }, [conversationId, currentUserId, hasMore, isLoadingOlder, isSearchWindow, messages]);
 
   const queueTextMessage = useCallback((rawBody: string, replyTo?: ChatMessage | null) => {
     if (!conversationId || !currentUserId) return false;
@@ -628,11 +662,14 @@ export function useConversationMessages(
     isInitialLoading,
     isLoadingOlder,
     hasMore,
+    isSearchWindow,
     loadError,
     actionError,
     realtimeState,
     reload: loadInitial,
     loadOlder,
+    loadMessageSearchWindow,
+    exitMessageSearchWindow,
     queueTextMessage,
     queueImageMessage,
     retryMessage,
@@ -646,10 +683,13 @@ export function useConversationMessages(
     editMessageContent,
     hasMore,
     isInitialLoading,
+    isSearchWindow,
     isLoadingOlder,
     loadError,
     loadInitial,
     loadOlder,
+    loadMessageSearchWindow,
+    exitMessageSearchWindow,
     messages,
     queueImageMessage,
     queueTextMessage,

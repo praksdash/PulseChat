@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -87,10 +87,12 @@ export default function ConversationScreen() {
   const params = useLocalSearchParams<{
     conversationId?: string | string[];
     name?: string | string[];
+    focusMessageId?: string | string[];
   }>();
 
   const conversationId = Array.isArray(params.conversationId) ? params.conversationId[0] : params.conversationId;
   const fallbackName = Array.isArray(params.name) ? params.name[0] : params.name;
+  const requestedFocusMessageId = Array.isArray(params.focusMessageId) ? params.focusMessageId[0] : params.focusMessageId;
 
   const [summary, setSummary] = useState<ConversationSummary | null>(null);
   const [isLoadingSummary, setIsLoadingSummary] = useState(true);
@@ -103,17 +105,22 @@ export default function ConversationScreen() {
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [isDeletingMessage, setIsDeletingMessage] = useState(false);
+  const [focusedMessageId, setFocusedMessageId] = useState<string | null>(requestedFocusMessageId ?? null);
+  const messageListRef = useRef<FlatList<ChatMessage> | null>(null);
 
   const {
     messages,
     isInitialLoading,
     isLoadingOlder,
     hasMore,
+    isSearchWindow,
     loadError,
     actionError,
     realtimeState,
     reload,
     loadOlder,
+    loadMessageSearchWindow,
+    exitMessageSearchWindow,
     queueTextMessage,
     queueImageMessage,
     retryMessage,
@@ -178,6 +185,39 @@ export default function ConversationScreen() {
     }
     void loadSummary();
   }), [conversationId, loadSummary]);
+
+  useEffect(() => {
+    setFocusedMessageId(requestedFocusMessageId ?? null);
+  }, [requestedFocusMessageId]);
+
+  useEffect(() => {
+    if (!focusedMessageId || !conversationId || !user?.id || isInitialLoading) return undefined;
+    let cancelled = false;
+
+    void loadMessageSearchWindow(focusedMessageId).then((found) => {
+      if (!cancelled && !found) setFocusedMessageId(null);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId, focusedMessageId, isInitialLoading, loadMessageSearchWindow, user?.id]);
+
+  useEffect(() => {
+    if (!focusedMessageId || !isSearchWindow) return;
+    const index = messages.findIndex((message) => message.id === focusedMessageId);
+    if (index < 0) return;
+
+    const timer = setTimeout(() => {
+      messageListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.5 });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [focusedMessageId, isSearchWindow, messages]);
+
+  const returnToLatest = useCallback(() => {
+    setFocusedMessageId(null);
+    void exitMessageSearchWindow();
+  }, [exitMessageSearchWindow]);
 
   const name = summary?.display_name ?? fallbackName ?? 'Conversation';
   const avatarUri = summary?.kind === 'group'
@@ -375,7 +415,11 @@ export default function ConversationScreen() {
           status={outgoing ? (item.localState ?? 'sent') : undefined}
         />
       );
-      return <View style={styles.messageRow}>{frameGroupIncoming(item, bubble)}</View>;
+      return (
+        <View style={[styles.messageRow, item.id === focusedMessageId && { backgroundColor: theme.colors.primarySoft }]}>
+          {frameGroupIncoming(item, bubble)}
+        </View>
+      );
     }
 
     if (item.message_type === 'image') {
@@ -404,7 +448,11 @@ export default function ConversationScreen() {
             onRetry={item.localState === 'failed' ? () => retryMessage(item.client_message_id) : undefined}
           />
       );
-      return <View style={styles.messageRow}>{frameGroupIncoming(item, bubble)}</View>;
+      return (
+        <View style={[styles.messageRow, item.id === focusedMessageId && { backgroundColor: theme.colors.primarySoft }]}>
+          {frameGroupIncoming(item, bubble)}
+        </View>
+      );
     }
 
     const body = item.body ?? (item.message_type === 'file' ? 'File' : 'Message');
@@ -424,7 +472,11 @@ export default function ConversationScreen() {
         onRetry={item.localState === 'failed' ? () => retryMessage(item.client_message_id) : undefined}
       />
     );
-    return <View style={styles.messageRow}>{frameGroupIncoming(item, bubble)}</View>;
+    return (
+        <View style={[styles.messageRow, item.id === focusedMessageId && { backgroundColor: theme.colors.primarySoft }]}>
+          {frameGroupIncoming(item, bubble)}
+        </View>
+      );
   };
 
   const renderMessages = () => {
@@ -466,8 +518,10 @@ export default function ConversationScreen() {
 
     return (
       <FlatList
+        ref={messageListRef}
         data={messages}
         inverted
+        initialNumToRender={40}
         keyExtractor={(item) => `${item.id}:${item.client_message_id}`}
         renderItem={renderMessage}
         onEndReached={() => {
@@ -478,6 +532,9 @@ export default function ConversationScreen() {
         keyboardDismissMode="interactive"
         contentContainerStyle={styles.messageListContent}
         showsVerticalScrollIndicator={false}
+        onScrollToIndexFailed={({ index }) => {
+          setTimeout(() => messageListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.5 }), 120);
+        }}
         ListFooterComponent={isLoadingOlder ? (
           <View style={styles.paginationLoader}>
             <ActivityIndicator size="small" color={theme.colors.primary} />
@@ -549,6 +606,17 @@ export default function ConversationScreen() {
         </View>
       ) : (
         <KeyboardAvoidingView style={styles.chatBody} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          {isSearchWindow ? (
+            <View style={[styles.searchResultBanner, { backgroundColor: theme.colors.primarySoft, borderBottomColor: theme.colors.border }]}>
+              <View style={styles.searchResultCopy}>
+                <AppText variant="captionStrong" tone="primary">Search result</AppText>
+                <AppText variant="micro" tone="secondary">Showing messages around the match</AppText>
+              </View>
+              <Pressable accessibilityRole="button" onPress={returnToLatest} hitSlop={8}>
+                <AppText variant="captionStrong" tone="primary">Back to latest</AppText>
+              </Pressable>
+            </View>
+          ) : null}
           <View style={styles.messages}>{renderMessages()}</View>
 
           {(loadError && messages.length > 0) || mediaError || actionError ? (
@@ -695,12 +763,14 @@ const styles = StyleSheet.create({
   },
   actionWidth: { width: '100%', maxWidth: 260 },
   messageListContent: { paddingHorizontal: 12, paddingVertical: 14 },
-  messageRow: { paddingVertical: 3 },
+  messageRow: { paddingVertical: 3, borderRadius: 12, paddingHorizontal: 3 },
   groupIncomingRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 7, maxWidth: '92%' },
   groupIncomingContent: { flex: 1, alignItems: 'flex-start', gap: 2 },
   groupSenderName: { paddingLeft: 4, maxWidth: 220 },
   paginationLoader: { alignItems: 'center', justifyContent: 'center', paddingVertical: 16 },
   inlineError: { marginHorizontal: 10, marginBottom: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },
+  searchResultBanner: { minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  searchResultCopy: { flex: 1, gap: 1 },
   composerContext: {
     minHeight: 54,
     flexDirection: 'row',

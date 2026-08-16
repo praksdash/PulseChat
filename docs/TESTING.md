@@ -124,3 +124,24 @@ Typing/presence is Phase 11; media is Phase 12.
 10. Sign B out. B's token row becomes disabled and the native registration is unregistered; messages to B must not expose previews on the signed-out installation.
 11. Remove C from a group, then tap an older group notification on C. Membership re-check must refuse navigation.
 12. Verify message delivery/read ticks, Realtime, images, replies/edits/deletes/reactions and group administration still work.
+
+## Phase 15 acceptance tests
+1. Android Profile > Notifications shows permission=granted and registered devices >= 1.
+2. "Test notification on this phone" shows an immediate local notification.
+3. "Test remote push from server" returns accepted and the phone receives PulseChat test.
+4. Put Android app in background; another account sends a message; notification appears; tapping opens the chat.
+5. Web Profile > Notifications -> enable browser alerts -> test notification appears.
+6. Leave PulseChat web open in a background tab; another account sends a message; browser notification appears and click opens the conversation.
+
+
+## Phase 16 search manual tests
+1. Run `supabase/phase16_verify.sql`; both trigram indexes and all three RPCs must exist, authenticated execute must be true, anon execute false.
+2. Search an existing profile by display name/username; People result opens the public-profile route.
+3. Search a direct peer name/username and a group title; Chats results open the correct conversations.
+4. Search a word from a recent and an old text message; both can be found.
+5. Search text contained in an image caption; the image result appears with Photo label.
+6. Tap an old message result; the conversation opens around the exact hit, target row is highlighted, and Back to latest returns to current messages.
+7. In Messages filter, load more results and confirm no duplicate message IDs.
+8. Delete a message that matched the query; rerun search and confirm it disappears.
+9. Remove a user from a group and confirm old group message results/window access are denied on a fresh search/open.
+10. Regression: people discovery, direct/group chat, realtime, media, replies/edits/deletes/reactions, receipts, presence and push notifications still operate.

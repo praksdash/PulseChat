@@ -18,3 +18,4 @@ export * from './message-reply-preview';
 export * from './message-actions-modal';
 
 export * from './confirm-action-modal';
+export * from './message-search-row';

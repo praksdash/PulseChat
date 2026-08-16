@@ -146,3 +146,16 @@ Server-only idempotency/ticket ledger. `UNIQUE(message_id, expo_push_token)` pre
 - `get_push_unread_counts(user_ids)` returns aggregate durable unread counts for notification badges.
 
 Clients cannot execute these two dispatcher RPCs.
+
+
+## Phase 16 search
+New database functions:
+- `search_my_conversations(search_term, result_limit)`
+- `search_my_messages(search_term, before_created_at, before_id, result_limit)`
+- `get_message_window(focus_message_id, before_count, after_count)`
+
+Indexes:
+- `messages_body_search_trgm_idx` — partial GIN trigram index over `lower(messages.body)` for non-deleted rows.
+- `conversations_title_search_trgm_idx` — partial GIN trigram index for group titles.
+
+Message search is cursor-paginated by `(created_at, id)` and only searches durable message body/caption text.

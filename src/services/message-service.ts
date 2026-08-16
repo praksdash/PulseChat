@@ -45,6 +45,19 @@ export async function getMessageDetail(messageId: string): Promise<MessagePageRo
   return rows[0] ?? null;
 }
 
+export async function getMessageWindow(messageId: string): Promise<MessagePageRow[]> {
+  if (!messageId) return [];
+
+  const { data, error } = await supabase.rpc('get_message_window', {
+    focus_message_id: messageId,
+    before_count: 18,
+    after_count: 18,
+  });
+
+  if (error) throw new Error(error.message);
+  return hydrateMessageMediaUrls((data ?? []) as MessagePageRow[]);
+}
+
 export async function sendTextMessage(input: {
   conversationId: string;
   senderId: string;

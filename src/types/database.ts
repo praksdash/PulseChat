@@ -594,6 +594,82 @@ export type Database = {
         Args: { target_conversation_id: string; target_title: string; target_avatar_path?: string | null };
         Returns: undefined;
       };
+      search_my_conversations: {
+        Args: { search_term: string; result_limit?: number };
+        Returns: Array<{
+          conversation_id: string;
+          kind: 'direct' | 'group';
+          display_name: string;
+          username: string | null;
+          avatar_path: string | null;
+          peer_user_id: string | null;
+          member_count: number;
+          my_role: 'member' | 'admin' | 'owner';
+          last_message_preview: string | null;
+          last_message_sender_id: string | null;
+          last_message_sender_name: string | null;
+          last_message_created_at: string | null;
+          last_activity_at: string;
+          unread_count: number;
+        }>;
+      };
+      search_my_messages: {
+        Args: {
+          search_term: string;
+          before_created_at?: string | null;
+          before_id?: string | null;
+          result_limit?: number;
+        };
+        Returns: Array<{
+          message_id: string;
+          conversation_id: string;
+          conversation_kind: 'direct' | 'group';
+          conversation_display_name: string;
+          conversation_avatar_path: string | null;
+          sender_id: string | null;
+          sender_display_name: string | null;
+          sender_avatar_path: string | null;
+          message_type: 'text' | 'image' | 'video' | 'audio' | 'voice' | 'file' | 'system';
+          body: string;
+          match_snippet: string;
+          created_at: string;
+          edited_at: string | null;
+        }>;
+      };
+      get_message_window: {
+        Args: { focus_message_id: string; before_count?: number; after_count?: number };
+        Returns: Array<{
+          id: string;
+          conversation_id: string;
+          sender_id: string | null;
+          sender_display_name: string | null;
+          sender_avatar_path: string | null;
+          client_message_id: string;
+          message_type: 'text' | 'image' | 'video' | 'audio' | 'voice' | 'file' | 'system';
+          body: string | null;
+          reply_to_message_id: string | null;
+          created_at: string;
+          edited_at: string | null;
+          deleted_at: string | null;
+          delivery_status: 'sent' | 'delivered' | 'read' | null;
+          attachment_id: string | null;
+          attachment_storage_bucket: string | null;
+          attachment_storage_path: string | null;
+          attachment_mime_type: string | null;
+          attachment_file_name: string | null;
+          attachment_file_size: number | null;
+          attachment_width: number | null;
+          attachment_height: number | null;
+          attachment_duration_ms: number | null;
+          reply_sender_id: string | null;
+          reply_sender_display_name: string | null;
+          reply_message_type: 'text' | 'image' | 'video' | 'audio' | 'voice' | 'file' | 'system' | null;
+          reply_body: string | null;
+          reply_deleted_at: string | null;
+          reaction_counts: Json;
+          my_reaction: string | null;
+        }>;
+      };
       get_my_total_unread_count: {
         Args: Record<string, never>;
         Returns: number;

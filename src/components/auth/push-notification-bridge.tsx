@@ -5,9 +5,13 @@ import { AppState, Platform } from 'react-native';
 
 import { useAuth } from '@/hooks/use-auth';
 import { getConversationSummary } from '@/services/conversation-service';
+import { getMessageDetail } from '@/services/message-service';
+import { subscribeToInboxMessages } from '@/services/inbox-message-events';
+import { canShowBrowserNotifications, isBrowserTabHidden, showBrowserNotification } from '@/services/browser-notification-service';
 import { emitConversationActivity, subscribeToConversationActivity } from '@/services/conversation-events';
 import {
   clearLastNotificationResponse,
+  getActivePushConversation,
   getLastNotificationResponse,
   registerForPushNotifications,
   resumePushRegistration,
@@ -75,6 +79,44 @@ export function PushNotificationBridge() {
     } catch (error) {
       console.warn('Unable to open notification conversation:', error);
     }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || Platform.OS !== 'web') return undefined;
+
+    return subscribeToInboxMessages((event) => {
+      if (event.senderId === user.id) return;
+      if (!canShowBrowserNotifications() || !isBrowserTabHidden()) return;
+      if (getActivePushConversation() === event.conversationId) return;
+
+      void (async () => {
+        try {
+          const [summary, message] = await Promise.all([
+            getConversationSummary(event.conversationId),
+            getMessageDetail(event.messageId),
+          ]);
+          if (!summary || !message || message.deleted_at) return;
+
+          let body = message.body?.trim() || 'New message';
+          if (message.message_type === 'image') body = message.body?.trim() ? `📷 ${message.body.trim()}` : '📷 Photo';
+          if (body.length > 180) body = `${body.slice(0, 177)}…`;
+
+          showBrowserNotification({
+            title: summary.display_name || 'PulseChat',
+            body,
+            conversationId: event.conversationId,
+            onClick: () => {
+              router.push({
+                pathname: '/chat/[conversationId]',
+                params: { conversationId: event.conversationId, name: summary.display_name },
+              });
+            },
+          });
+        } catch (error) {
+          console.warn('Unable to show PulseChat browser notification:', error);
+        }
+      })();
+    });
   }, [user?.id]);
 
   useEffect(() => {

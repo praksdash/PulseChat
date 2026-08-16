@@ -82,7 +82,8 @@ export default function ProfileScreen() {
             <SettingsRow
               icon={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }}
               title="Notifications"
-              subtitle="Push preferences arrive in Phase 15"
+              subtitle="Phone & web notification settings"
+              onPress={() => router.push('/profile/notifications')}
             />
             <SettingsRow
               icon={{ ios: 'paintpalette.fill', android: 'palette', web: 'palette' }}
