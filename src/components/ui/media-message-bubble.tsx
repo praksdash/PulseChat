@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { memo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppIcon } from './app-icon';
@@ -40,7 +41,7 @@ function getPreviewSize(width?: number | null, height?: number | null) {
   return { width: previewWidth, height: Math.round(previewWidth / clampedRatio) };
 }
 
-export function MediaMessageBubble({
+function MediaMessageBubbleComponent({
   uri,
   width,
   height,
@@ -159,6 +160,30 @@ export function MediaMessageBubble({
     </View>
   );
 }
+
+function sameReactions(a?: MessageReactionSummary[], b?: MessageReactionSummary[]) {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((item, index) => item.emoji === b[index]?.emoji && item.count === b[index]?.count);
+}
+
+function areMediaMessageBubblePropsEqual(previous: MediaMessageBubbleProps, next: MediaMessageBubbleProps) {
+  return previous.uri === next.uri
+    && previous.width === next.width
+    && previous.height === next.height
+    && previous.caption === next.caption
+    && previous.time === next.time
+    && previous.outgoing === next.outgoing
+    && previous.status === next.status
+    && previous.mediaStage === next.mediaStage
+    && previous.edited === next.edited
+    && previous.replySenderLabel === next.replySenderLabel
+    && previous.replyText === next.replyText
+    && previous.myReaction === next.myReaction
+    && sameReactions(previous.reactions, next.reactions);
+}
+
+export const MediaMessageBubble = memo(MediaMessageBubbleComponent, areMediaMessageBubblePropsEqual);
 
 const styles = StyleSheet.create({
   wrapper: { maxWidth: '86%', gap: 2 },

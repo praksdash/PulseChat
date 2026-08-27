@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from './app-text';
@@ -21,7 +22,7 @@ type ChatRowProps = {
   onPress: () => void;
 };
 
-export function ChatRow({ chat, onPress }: ChatRowProps) {
+function ChatRowComponent({ chat, onPress }: ChatRowProps) {
   const theme = useAppTheme();
 
   return (
@@ -58,6 +59,23 @@ export function ChatRow({ chat, onPress }: ChatRowProps) {
     </Pressable>
   );
 }
+
+function areChatRowPropsEqual(previous: ChatRowProps, next: ChatRowProps) {
+  return previous.chat === next.chat
+    || (
+      previous.chat.id === next.chat.id
+      && previous.chat.name === next.chat.name
+      && previous.chat.preview === next.chat.preview
+      && previous.chat.time === next.chat.time
+      && previous.chat.unread === next.chat.unread
+      && previous.chat.online === next.chat.online
+      && previous.chat.muted === next.chat.muted
+      && previous.chat.sentByMe === next.chat.sentByMe
+      && previous.chat.avatarUri === next.chat.avatarUri
+    );
+}
+
+export const ChatRow = memo(ChatRowComponent, areChatRowPropsEqual);
 
 const styles = StyleSheet.create({
   row: {

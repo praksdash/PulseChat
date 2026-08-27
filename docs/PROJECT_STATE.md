@@ -161,3 +161,22 @@ Run `npm run typecheck`, then perform the offline/reconnect acceptance test in `
 
 ## Next task
 After Phase 19 acceptance: Phase 20 — performance optimization.
+
+## Phase 20 implementation
+- Chats and message FlatLists now use bounded initial render counts, batch sizes and virtualization windows.
+- ChatRow, Avatar, MessageBubble and MediaMessageBubble are memoized around visual/state-bearing props.
+- Chat/message timestamp formatters are reused rather than allocated per row render.
+- Overlapping active-chat latest reconciliation requests are coalesced with a trailing authoritative refresh.
+- Chat-list activity bursts are coalesced before summary refresh.
+- Private Storage signed URLs use a bounded 50-minute in-memory cache and batch signing for cache misses.
+- Encrypted offline cache writes skip identical payloads to reduce AES/AsyncStorage work.
+- Initial online mount no longer triggers a duplicate reconnect refresh in Chats/conversation summary flows.
+
+## Phase 20 migration
+None.
+
+## Phase 20 verification
+Run `npm run typecheck`, `npx expo start -c`, then the Phase 20 tests in `docs/TESTING.md`. Optional Android bundle validation: `npm run check:android`.
+
+## Next task
+After Phase 20 acceptance: Phase 21 — security review.

@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from './app-text';
@@ -21,7 +22,7 @@ function getInitials(name: string) {
     .join('');
 }
 
-export function Avatar({ name, uri, size = 52, online = false, accent }: AvatarProps) {
+function AvatarComponent({ name, uri, size = 52, online = false, accent }: AvatarProps) {
   const theme = useAppTheme();
   const badgeSize = Math.max(12, Math.round(size * 0.26));
 
@@ -43,6 +44,8 @@ export function Avatar({ name, uri, size = 52, online = false, accent }: AvatarP
             source={{ uri }}
             contentFit="cover"
             transition={140}
+            cachePolicy="memory-disk"
+            recyclingKey={uri}
             style={{ width: size, height: size }}
           />
         ) : (
@@ -70,6 +73,8 @@ export function Avatar({ name, uri, size = 52, online = false, accent }: AvatarP
     </View>
   );
 }
+
+export const Avatar = memo(AvatarComponent);
 
 const styles = StyleSheet.create({
   avatar: { alignItems: 'center', justifyContent: 'center' },

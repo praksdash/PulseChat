@@ -26,6 +26,12 @@ import {
   MessageBubble,
   ReportModal,
 } from '@/components/ui';
+import {
+  MESSAGE_LIST_INITIAL_RENDER,
+  MESSAGE_LIST_MAX_TO_RENDER_PER_BATCH,
+  MESSAGE_LIST_UPDATE_BATCH_MS,
+  MESSAGE_LIST_WINDOW_SIZE,
+} from '@/config/performance-config';
 import { useAuth } from '@/hooks/use-auth';
 import { useConnectivity } from '@/hooks/use-connectivity';
 import { useConversationMessages } from '@/hooks/use-conversation-messages';
@@ -46,10 +52,14 @@ import type { ConversationSummary } from '@/types/conversation';
 import type { ChatMessage, ReplyPreview, SupportedReaction } from '@/types/message';
 import type { ReportReason, UserRelationshipState } from '@/types/privacy';
 
+const messageTimeFormatter = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+const lastSeenTimeFormatter = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+const lastSeenDayFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+
 function formatMessageTime(iso: string) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date);
+  return messageTimeFormatter.format(date);
 }
 
 function formatLastSeen(iso: string | null) {
@@ -61,14 +71,14 @@ function formatLastSeen(iso: string | null) {
   const differenceMs = now.getTime() - date.getTime();
   if (differenceMs >= 0 && differenceMs < 60_000) return 'last seen just now';
 
-  const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date);
+  const time = lastSeenTimeFormatter.format(date);
   if (date.toDateString() === now.toDateString()) return `last seen at ${time}`;
 
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
   if (date.toDateString() === yesterday.toDateString()) return `last seen yesterday at ${time}`;
 
-  const day = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date);
+  const day = lastSeenDayFormatter.format(date);
   return `last seen ${day} at ${time}`;
 }
 
@@ -119,6 +129,7 @@ export default function ConversationScreen() {
   const [isDeletingMessage, setIsDeletingMessage] = useState(false);
   const [focusedMessageId, setFocusedMessageId] = useState<string | null>(requestedFocusMessageId ?? null);
   const messageListRef = useRef<FlatList<ChatMessage> | null>(null);
+  const wasOnlineRef = useRef(isOnline);
 
   const {
     messages,
@@ -221,7 +232,9 @@ export default function ConversationScreen() {
   );
 
   useEffect(() => {
-    if (isOnline) void loadSummary();
+    const wasOnline = wasOnlineRef.current;
+    wasOnlineRef.current = isOnline;
+    if (!wasOnline && isOnline) void loadSummary();
   }, [isOnline, loadSummary]);
 
   useFocusEffect(
@@ -617,8 +630,12 @@ export default function ConversationScreen() {
         ref={messageListRef}
         data={messages}
         inverted
-        initialNumToRender={40}
-        keyExtractor={(item) => `${item.id}:${item.client_message_id}`}
+        initialNumToRender={MESSAGE_LIST_INITIAL_RENDER}
+        maxToRenderPerBatch={MESSAGE_LIST_MAX_TO_RENDER_PER_BATCH}
+        updateCellsBatchingPeriod={MESSAGE_LIST_UPDATE_BATCH_MS}
+        windowSize={MESSAGE_LIST_WINDOW_SIZE}
+        removeClippedSubviews={Platform.OS === 'android'}
+        keyExtractor={(item) => item.id}
         renderItem={renderMessage}
         onEndReached={() => {
           if (hasMore) void loadOlder();

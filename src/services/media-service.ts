@@ -2,6 +2,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 
+import { MEDIA_SIGNED_URL_CACHE_MAX_ENTRIES, MEDIA_SIGNED_URL_MEMORY_TTL_MS } from '@/config/performance-config';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
 import type { MediaSendStage, MessagePageRow, PendingImageAsset } from '@/types/message';
@@ -10,6 +11,30 @@ export const CHAT_MEDIA_BUCKET = 'chat-media';
 export const CHAT_IMAGE_MAX_DIMENSION = 1600;
 export const CHAT_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 export const CHAT_MEDIA_SIGNED_URL_SECONDS = 60 * 60;
+
+type SignedUrlCacheEntry = { url: string; expiresAt: number };
+const signedUrlMemoryCache = new Map<string, SignedUrlCacheEntry>();
+
+function getCachedSignedUrl(path: string) {
+  const cached = signedUrlMemoryCache.get(path);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    signedUrlMemoryCache.delete(path);
+    return null;
+  }
+  return cached.url;
+}
+
+function rememberSignedUrl(path: string, url: string) {
+  if (signedUrlMemoryCache.size >= MEDIA_SIGNED_URL_CACHE_MAX_ENTRIES) {
+    const oldestKey = signedUrlMemoryCache.keys().next().value as string | undefined;
+    if (oldestKey) signedUrlMemoryCache.delete(oldestKey);
+  }
+  signedUrlMemoryCache.set(path, {
+    url,
+    expiresAt: Date.now() + MEDIA_SIGNED_URL_MEMORY_TTL_MS,
+  });
+}
 
 type CreateImageMessageRow =
   Database['public']['Functions']['create_image_message']['Returns'][number];
@@ -129,11 +154,15 @@ export function getChatMediaPath(input: {
 }
 
 export async function createChatMediaSignedUrl(path: string) {
+  const cached = getCachedSignedUrl(path);
+  if (cached) return cached;
+
   const { data, error } = await supabase.storage
     .from(CHAT_MEDIA_BUCKET)
     .createSignedUrl(path, CHAT_MEDIA_SIGNED_URL_SECONDS);
 
   if (error) throw new Error(error.message);
+  rememberSignedUrl(path, data.signedUrl);
   return data.signedUrl;
 }
 
@@ -146,27 +175,36 @@ export async function hydrateMessageMediaUrls(rows: MessagePageRow[]): Promise<M
 
   if (paths.length === 0) return rows;
 
-  const { data, error } = await supabase.storage
-    .from(CHAT_MEDIA_BUCKET)
-    .createSignedUrls(paths, CHAT_MEDIA_SIGNED_URL_SECONDS);
-
-  if (error) {
-    console.warn('Unable to sign chat media URLs:', error.message);
-    return rows;
+  const signedByPath = new Map<string, string>();
+  const missingPaths: string[] = [];
+  for (const path of paths) {
+    const cached = getCachedSignedUrl(path);
+    if (cached) signedByPath.set(path, cached);
+    else missingPaths.push(path);
   }
 
-  const signedByPath = new Map<string, string>();
-  for (const entry of data ?? []) {
-    const candidate = entry as { path?: string | null; signedUrl?: string | null };
-    if (candidate.path && candidate.signedUrl) {
-      signedByPath.set(candidate.path, candidate.signedUrl);
+  if (missingPaths.length > 0) {
+    const { data, error } = await supabase.storage
+      .from(CHAT_MEDIA_BUCKET)
+      .createSignedUrls(missingPaths, CHAT_MEDIA_SIGNED_URL_SECONDS);
+
+    if (error) {
+      console.warn('Unable to sign chat media URLs:', error.message);
+    } else {
+      for (const entry of data ?? []) {
+        const candidate = entry as { path?: string | null; signedUrl?: string | null };
+        if (candidate.path && candidate.signedUrl) {
+          signedByPath.set(candidate.path, candidate.signedUrl);
+          rememberSignedUrl(candidate.path, candidate.signedUrl);
+        }
+      }
     }
   }
 
   return rows.map((row) => ({
     ...row,
     signed_media_url: row.attachment_storage_path
-      ? (signedByPath.get(row.attachment_storage_path) ?? null)
+      ? (signedByPath.get(row.attachment_storage_path) ?? row.signed_media_url ?? null)
       : null,
   }));
 }

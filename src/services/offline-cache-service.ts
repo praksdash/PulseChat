@@ -11,6 +11,8 @@ import type { MessagePageRow } from '@/types/message';
 const CACHE_PREFIX = 'pulsechat.cache.v1';
 const MAX_CACHED_CONVERSATIONS = 60;
 const MAX_CACHED_MESSAGES = 60;
+const MAX_WRITE_FINGERPRINTS = 160;
+const lastWrittenPayload = new Map<string, string>();
 
 type CacheEnvelope<T> = {
   savedAt: string;
@@ -44,8 +46,17 @@ async function readEnvelope<T>(key: string): Promise<CacheEnvelope<T> | null> {
 
 async function writeEnvelope<T>(key: string, data: T) {
   try {
+    const payloadFingerprint = JSON.stringify(data);
+    if (lastWrittenPayload.get(key) === payloadFingerprint) return;
+
     const envelope: CacheEnvelope<T> = { savedAt: new Date().toISOString(), data };
     await localVaultSet(key, JSON.stringify(envelope));
+
+    if (lastWrittenPayload.size >= MAX_WRITE_FINGERPRINTS && !lastWrittenPayload.has(key)) {
+      const oldestKey = lastWrittenPayload.keys().next().value as string | undefined;
+      if (oldestKey) lastWrittenPayload.delete(oldestKey);
+    }
+    lastWrittenPayload.set(key, payloadFingerprint);
   } catch (error) {
     console.warn('Unable to write PulseChat offline cache:', error);
   }
@@ -99,7 +110,10 @@ export async function clearUserOfflineCache(userId: string) {
       || key.startsWith(`${CACHE_PREFIX}:messages:${userId}:`)
       || key.startsWith(`${CACHE_PREFIX}:summary:${userId}:`)
     ));
-    if (userKeys.length > 0) await localVaultMultiRemove(userKeys);
+    if (userKeys.length > 0) {
+      await localVaultMultiRemove(userKeys);
+      userKeys.forEach((key: string) => lastWrittenPayload.delete(key));
+    }
   } catch (error) {
     console.warn('Unable to clear PulseChat offline cache:', error);
   }

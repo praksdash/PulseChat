@@ -1,9 +1,15 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Platform, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, AppIcon, AppText, ChatRow, type ChatRowModel, EmptyState, SearchBar } from '@/components/ui';
+import {
+  CHAT_LIST_INITIAL_RENDER,
+  CHAT_LIST_MAX_TO_RENDER_PER_BATCH,
+  CHAT_LIST_UPDATE_BATCH_MS,
+  CHAT_LIST_WINDOW_SIZE,
+} from '@/config/performance-config';
 import { useAuth } from '@/hooks/use-auth';
 import { useConnectivity } from '@/hooks/use-connectivity';
 import { getGroupAvatarPublicUrl } from '@/services/group-service';
@@ -13,6 +19,10 @@ import { listMyConversations } from '@/services/conversation-service';
 import { subscribeToConversationActivity } from '@/services/conversation-events';
 import { useAppTheme } from '@/theme';
 import type { ConversationListItem } from '@/types/conversation';
+
+const conversationClockFormatter = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+const conversationWeekdayFormatter = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+const conversationDateFormatter = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
 
 function formatConversationTime(iso: string | null) {
   if (!iso) return '';
@@ -27,10 +37,7 @@ function formatConversationTime(iso: string | null) {
     && date.getDate() === now.getDate();
 
   if (sameDay) {
-    return new Intl.DateTimeFormat(undefined, {
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(date);
+    return conversationClockFormatter.format(date);
   }
 
   const yesterday = new Date(now);
@@ -43,9 +50,7 @@ function formatConversationTime(iso: string | null) {
   if (isYesterday) return 'Yesterday';
 
   const sameYear = date.getFullYear() === now.getFullYear();
-  return new Intl.DateTimeFormat(undefined, sameYear
-    ? { weekday: 'short' }
-    : { day: 'numeric', month: 'short' }).format(date);
+  return (sameYear ? conversationWeekdayFormatter : conversationDateFormatter).format(date);
 }
 
 function toChatRow(item: ConversationListItem, currentUserId: string | undefined): ChatRowModel {
@@ -76,6 +81,7 @@ export default function ChatsScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isShowingCached, setIsShowingCached] = useState(false);
+  const wasOnlineRef = useRef(isOnline);
 
   const loadConversations = useCallback(async (mode: 'load' | 'refresh' | 'background' = 'load') => {
     if (mode === 'load') setIsLoading(true);
@@ -128,8 +134,23 @@ export default function ChatsScreen() {
   }), [loadConversations]);
 
   useEffect(() => {
-    if (isOnline) void loadConversations('background');
+    const wasOnline = wasOnlineRef.current;
+    wasOnlineRef.current = isOnline;
+    if (!wasOnline && isOnline) void loadConversations('background');
   }, [isOnline, loadConversations]);
+
+  const chatRows = useMemo(() => {
+    const rows = new Map<string, ChatRowModel>();
+    conversations.forEach((conversation) => {
+      rows.set(conversation.conversation_id, toChatRow(conversation, user?.id));
+    });
+    return rows;
+  }, [conversations, user?.id]);
+
+  const unreadCount = useMemo(
+    () => conversations.reduce((sum, item) => sum + (item.unread_count ?? 0), 0),
+    [conversations],
+  );
 
   const visibleConversations = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -142,7 +163,7 @@ export default function ChatsScreen() {
     });
   }, [conversations, query]);
 
-  const openChat = (conversation: ConversationListItem) => {
+  const openChat = useCallback((conversation: ConversationListItem) => {
     router.push({
       pathname: '/chat/[conversationId]',
       params: {
@@ -150,15 +171,21 @@ export default function ChatsScreen() {
         name: conversation.display_name,
       },
     });
-  };
+  }, []);
 
-  const openDiscovery = () => {
+  const openDiscovery = useCallback(() => {
     router.push('/search');
-  };
+  }, []);
 
-  const openGroupCreator = () => {
+  const openGroupCreator = useCallback(() => {
     router.push('/groups/new');
-  };
+  }, []);
+
+  const renderChatItem = useCallback(({ item }: { item: ConversationListItem }) => {
+    const row = chatRows.get(item.conversation_id);
+    if (!row) return null;
+    return <ChatRow chat={row} onPress={() => openChat(item)} />;
+  }, [chatRows, openChat]);
 
   const renderContent = () => {
     if (isLoading && conversations.length === 0) {
@@ -220,9 +247,12 @@ export default function ChatsScreen() {
       <FlatList
         data={visibleConversations}
         keyExtractor={(item) => item.conversation_id}
-        renderItem={({ item }) => (
-          <ChatRow chat={toChatRow(item, user?.id)} onPress={() => openChat(item)} />
-        )}
+        renderItem={renderChatItem}
+        initialNumToRender={CHAT_LIST_INITIAL_RENDER}
+        maxToRenderPerBatch={CHAT_LIST_MAX_TO_RENDER_PER_BATCH}
+        updateCellsBatchingPeriod={CHAT_LIST_UPDATE_BATCH_MS}
+        windowSize={CHAT_LIST_WINDOW_SIZE}
+        removeClippedSubviews={Platform.OS !== 'web'}
         refreshControl={(
           <RefreshControl
             refreshing={isRefreshing}
@@ -243,8 +273,8 @@ export default function ChatsScreen() {
         <View>
           <AppText variant="title">PulseChat</AppText>
           <AppText variant="caption" tone="secondary">
-            {conversations.reduce((sum, item) => sum + (item.unread_count ?? 0), 0) > 0
-              ? `${conversations.reduce((sum, item) => sum + (item.unread_count ?? 0), 0)} unread`
+            {unreadCount > 0
+              ? `${unreadCount} unread`
               : (conversations.length === 1 ? '1 conversation' : `${conversations.length} conversations`)}
           </AppText>
         </View>

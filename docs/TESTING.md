@@ -190,3 +190,16 @@ Typing/presence is Phase 11; media is Phase 12.
 10. Restore network and confirm Realtime state, read receipts and the Chats preview reconcile.
 11. Delete a disposable account and verify its local cache/outbox entries are removed best-effort after successful server deletion.
 12. Regression: direct/group text, images, reply/edit/delete/reactions, search, privacy, mute and push behavior still function online.
+
+## Phase 20 performance manual tests
+1. Run `npm run typecheck` and start with `npx expo start -c`.
+2. Open Chats and repeatedly type/clear local chat search while scrolling. No stale row, incorrect avatar, or wrong tap target may appear.
+3. Open a conversation with a long history, rapidly scroll toward older messages, and confirm pagination loads once per boundary without duplicate visible messages.
+4. Send/receive a burst of messages. The active conversation must update immediately and the Chats preview/unread count must reconcile without repeated loading spinners.
+5. In a group, verify sender avatar/name, replies and reactions still refresh after incoming messages despite memoized bubbles.
+6. Open an image-heavy chat twice in the same app session. Images should reuse signed/media caches and must still open in the full-screen viewer.
+7. Edit, delete and react to a message; only the affected bubble state should change and all actions must still work.
+8. Toggle System/Light/Dark while Chats and a message screen are mounted. Memoized rows must adopt the new theme immediately.
+9. Repeat the Phase 19 offline queue/reconnect test; queued text/images and encrypted cached reads must behave identically.
+10. Run `npm run check:android` before marking the phase complete if the local Android/Expo environment is available.
+11. Regression: notifications, mute, search, groups, block/report/privacy, account deletion and realtime receipts remain functional.

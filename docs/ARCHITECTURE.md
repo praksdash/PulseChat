@@ -205,3 +205,21 @@ ConnectivityProvider (backend reachability)
 Recent conversation lists, summaries and message pages are cached locally after successful reads. Native cache/outbox payloads are AES-encrypted before AsyncStorage persistence, with the encryption key kept in Expo SecureStore. Web follows browser-origin storage semantics.
 
 Text outbox entries are durable across app restarts. Image picker/camera URIs are intentionally session-only because temporary mobile URIs are not reliable across process restarts. Realtime remains an acceleration layer; PostgreSQL remains the source of truth after reconnection.
+
+## Phase 20 performance architecture
+
+Phase 20 adds client-side work coalescing without introducing a second source of truth:
+
+```text
+UI / Realtime burst
+      ↓
+short coalescing + in-flight request dedupe
+      ↓
+existing paginated Supabase RPCs
+      ↓
+PostgreSQL authoritative state
+```
+
+Message/chat FlatLists use bounded render windows and batched cell mounting. Hot row components are memoized around state-bearing props. Private media signing uses a bounded in-memory cache whose TTL is shorter than the one-hour signed URL lifetime. Phase 19 encrypted offline writes skip identical payloads so reconnect/focus reconciliation does not repeatedly encrypt and write the same cache snapshot.
+
+No Phase 20 optimization bypasses RLS, durable message persistence, receipts, privacy rules or retry idempotency.

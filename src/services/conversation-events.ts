@@ -1,3 +1,5 @@
+import { CONVERSATION_ACTIVITY_COALESCE_MS } from '@/config/performance-config';
+
 export type ConversationActivityEvent = {
   type: 'message' | 'read';
   conversationId?: string;
@@ -34,7 +36,7 @@ export function emitConversationActivity(event: ConversationActivityEvent) {
   }
 
   if (!flushTimer) {
-    flushTimer = setTimeout(flushConversationActivity, 120);
+    flushTimer = setTimeout(flushConversationActivity, CONVERSATION_ACTIVITY_COALESCE_MS);
   }
 }
 

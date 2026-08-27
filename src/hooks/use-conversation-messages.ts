@@ -304,6 +304,8 @@ export function useConversationMessages(
   const activeConversationKeyRef = useRef<string | null>(null);
   const sendingTextIdsRef = useRef(new Set<string>());
   const sendingImageIdsRef = useRef(new Set<string>());
+  const refreshLatestInFlightRef = useRef<Promise<void> | null>(null);
+  const refreshLatestQueuedRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -382,19 +384,39 @@ export function useConversationMessages(
     }
   }, [checkConnectivity, conversationId, currentUserId, isOnline, markRead]);
 
-  const refreshLatest = useCallback(async () => {
-    if (!conversationId || !currentUserId || !isOnline) return;
-    try {
-      const page = await listConversationMessages(conversationId);
-      if (!mountedRef.current) return;
-      setMessages((current) => mergeServerMessages(current, page, currentUserId));
-      setLoadError(null);
-      void cacheConversationMessages(currentUserId, conversationId, page);
-      void markRead();
-    } catch (error) {
-      console.warn('Unable to reconcile latest messages:', error);
-      if (isRetryableNetworkError(error)) void checkConnectivity();
+  const refreshLatest = useCallback((): Promise<void> => {
+    if (!conversationId || !currentUserId || !isOnline) return Promise.resolve();
+
+    if (refreshLatestInFlightRef.current) {
+      // Receipt/reconnect/app-state events can arrive together. Keep one request
+      // in flight and remember that one authoritative trailing refresh is needed.
+      refreshLatestQueuedRef.current = true;
+      return refreshLatestInFlightRef.current;
     }
+
+    const request = (async () => {
+      do {
+        refreshLatestQueuedRef.current = false;
+        try {
+          const page = await listConversationMessages(conversationId);
+          if (!mountedRef.current) return;
+          setMessages((current) => mergeServerMessages(current, page, currentUserId));
+          setLoadError(null);
+          void cacheConversationMessages(currentUserId, conversationId, page);
+          void markRead();
+        } catch (error) {
+          console.warn('Unable to reconcile latest messages:', error);
+          if (isRetryableNetworkError(error)) void checkConnectivity();
+        }
+      } while (refreshLatestQueuedRef.current && mountedRef.current && isOnline);
+    })();
+
+    refreshLatestInFlightRef.current = request;
+    const cleanup = () => {
+      if (refreshLatestInFlightRef.current === request) refreshLatestInFlightRef.current = null;
+    };
+    void request.then(cleanup, cleanup);
+    return request;
   }, [checkConnectivity, conversationId, currentUserId, isOnline, markRead]);
 
   const refreshOne = useCallback(async (messageId: string) => {

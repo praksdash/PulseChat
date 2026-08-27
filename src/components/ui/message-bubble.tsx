@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppIcon } from './app-icon';
@@ -24,7 +25,7 @@ type MessageBubbleProps = {
   onLongPress?: () => void;
 };
 
-export function MessageBubble({
+function MessageBubbleComponent({
   text,
   time,
   outgoing = false,
@@ -102,6 +103,26 @@ export function MessageBubble({
     </View>
   );
 }
+
+function sameReactions(a?: MessageReactionSummary[], b?: MessageReactionSummary[]) {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((item, index) => item.emoji === b[index]?.emoji && item.count === b[index]?.count);
+}
+
+function areMessageBubblePropsEqual(previous: MessageBubbleProps, next: MessageBubbleProps) {
+  return previous.text === next.text
+    && previous.time === next.time
+    && previous.outgoing === next.outgoing
+    && previous.status === next.status
+    && previous.edited === next.edited
+    && previous.replySenderLabel === next.replySenderLabel
+    && previous.replyText === next.replyText
+    && previous.myReaction === next.myReaction
+    && sameReactions(previous.reactions, next.reactions);
+}
+
+export const MessageBubble = memo(MessageBubbleComponent, areMessageBubblePropsEqual);
 
 const styles = StyleSheet.create({
   wrapper: { maxWidth: '82%', gap: 2 },
