@@ -6,6 +6,7 @@
 -- Account-wide notification preferences
 -- -----------------------------------------------------------------------------
 
+
 create table if not exists public.notification_preferences (
   user_id uuid primary key references auth.users(id) on delete cascade,
   direct_messages boolean not null default true,
