@@ -22,3 +22,4 @@ export * from './confirm-action-modal';
 export * from './message-search-row';
 
 export * from './report-modal';
+export * from './connectivity-banner';

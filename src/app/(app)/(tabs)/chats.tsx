@@ -5,7 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, AppIcon, AppText, ChatRow, type ChatRowModel, EmptyState, SearchBar } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
+import { useConnectivity } from '@/hooks/use-connectivity';
 import { getGroupAvatarPublicUrl } from '@/services/group-service';
+import { cacheConversationList, loadCachedConversationList } from '@/services/offline-cache-service';
 import { getAvatarPublicUrl } from '@/services/profile-service';
 import { listMyConversations } from '@/services/conversation-service';
 import { subscribeToConversationActivity } from '@/services/conversation-events';
@@ -67,28 +69,53 @@ function toChatRow(item: ConversationListItem, currentUserId: string | undefined
 export default function ChatsScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
+  const { isOnline } = useConnectivity();
   const [query, setQuery] = useState('');
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isShowingCached, setIsShowingCached] = useState(false);
 
   const loadConversations = useCallback(async (mode: 'load' | 'refresh' | 'background' = 'load') => {
     if (mode === 'load') setIsLoading(true);
     if (mode === 'refresh') setIsRefreshing(true);
     setError(null);
 
+    if (!isOnline && user?.id) {
+      const cached = await loadCachedConversationList(user.id);
+      if (cached?.data?.length) {
+        setConversations(cached.data);
+        setIsShowingCached(true);
+        setError('Offline — showing conversations saved on this device.');
+      } else {
+        setError('You are offline and no saved conversations are available yet.');
+      }
+      setIsLoading(false);
+      setIsRefreshing(false);
+      return;
+    }
+
     try {
       const data = await listMyConversations();
       setConversations(data);
+      setIsShowingCached(false);
+      if (user?.id) void cacheConversationList(user.id, data);
     } catch (loadError) {
       console.warn('Unable to load conversations:', loadError);
-      setError('Unable to load your conversations right now.');
+      const cached = user?.id ? await loadCachedConversationList(user.id) : null;
+      if (cached?.data?.length) {
+        setConversations(cached.data);
+        setIsShowingCached(true);
+        setError('Offline — showing conversations saved on this device.');
+      } else {
+        setError('Unable to load your conversations right now.');
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [isOnline, user?.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -99,6 +126,10 @@ export default function ChatsScreen() {
   useEffect(() => subscribeToConversationActivity(() => {
     void loadConversations('background');
   }), [loadConversations]);
+
+  useEffect(() => {
+    if (isOnline) void loadConversations('background');
+  }, [isOnline, loadConversations]);
 
   const visibleConversations = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -261,7 +292,7 @@ export default function ChatsScreen() {
 
       {error && conversations.length > 0 ? (
         <View style={[styles.inlineError, { backgroundColor: theme.colors.surfaceMuted }]}>
-          <AppText variant="caption" tone="danger">{error}</AppText>
+          <AppText variant="caption" tone={isShowingCached ? 'secondary' : 'danger'}>{error}</AppText>
         </View>
       ) : null}
 

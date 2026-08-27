@@ -139,3 +139,15 @@ No RPC accepts an acting-user ID; authorization always derives the actor from `a
 
 ## Phase 18 Edge Function
 - `delete-account` — authenticated destructive account deletion. The request body must contain `{ "confirm": true }`. The function derives the account from the bearer token, cleans up the auth user/avatar and repairs owned-group ownership.
+
+## Phase 19 client-only resilience APIs
+
+No new public database RPCs or Edge Functions are introduced.
+
+Client services:
+- `ConnectivityProvider` / `useConnectivity()` — backend reachability state and manual recheck.
+- `offline-cache-service` — recent conversation/message cache.
+- `offline-outbox-service` — durable text outbox keyed by user and `client_message_id`.
+- `local-vault-service` — native encrypted persistence wrapper over AsyncStorage + SecureStore.
+
+All reconnect sends use the existing message insert API and existing server authorization.

@@ -183,3 +183,25 @@ Foreground delivery deliberately suppresses the OS banner when the user already 
 - Native remote push preferences are enforced server-side by `send-message-push`.
 - Web alerts use the browser Notification API but consume the same account preferences and per-chat mute RPC.
 - Destructive account deletion is isolated in a Supabase Edge Function so service-role credentials never enter the Expo bundle.
+
+## Phase 19 offline/resilience architecture
+
+```text
+UI action
+   ↓
+ConnectivityProvider (backend reachability)
+   ├─ online → normal Supabase operation
+   └─ offline → local cache / durable text outbox
+                    ↓
+              reconnect detected
+                    ↓
+           flush with same client_message_id
+                    ↓
+         PostgreSQL unique deduplication
+                    ↓
+            authoritative reconciliation
+```
+
+Recent conversation lists, summaries and message pages are cached locally after successful reads. Native cache/outbox payloads are AES-encrypted before AsyncStorage persistence, with the encryption key kept in Expo SecureStore. Web follows browser-origin storage semantics.
+
+Text outbox entries are durable across app restarts. Image picker/camera URIs are intentionally session-only because temporary mobile URIs are not reliable across process restarts. Realtime remains an acceleration layer; PostgreSQL remains the source of truth after reconnection.

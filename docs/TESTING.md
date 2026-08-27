@@ -175,3 +175,18 @@ Typing/presence is Phase 11; media is Phase 12.
 11. Profile → Settings → Account → Sign out; the authenticated app is left and push registration is disabled as before.
 12. With a disposable test account, create/own a group with another member, then Delete account. Confirm the account can no longer sign in, its profile is gone, and the group remains with another owner. If the deleted account was the only group member, the empty group should be removed.
 13. Regression: direct/group messaging, images, replies, edits, deletes, reactions, search, block/report/privacy, receipts, presence and push tests continue to work.
+
+## Phase 19 offline/error-handling manual tests
+
+1. Warm the cache by opening Chats and a conversation online, then disable network connectivity.
+2. Confirm the global Offline banner appears and the cached Chats list remains usable.
+3. Open the previously visited conversation and confirm cached recent messages render instead of an empty fatal state.
+4. Send two text messages offline. Both must appear immediately as `Waiting for connection…`.
+5. Navigate away/back (or restart the app where practical) while still offline; persisted text outbox messages must be restored.
+6. Restore network. Queued text must automatically reconcile to sent/delivered/read without duplicate messages.
+7. Simulate a lost response/retry and confirm the existing `client_message_id` constraint reconciles to one durable row.
+8. Queue an image offline, keep the app process alive, restore network, and confirm automatic upload. Then document that killing the app may require reselecting the image.
+9. While offline, try edit, delete, reaction, old-message search and load-older; each must show a clear connection-required state and must not corrupt local data.
+10. Restore network and confirm Realtime state, read receipts and the Chats preview reconcile.
+11. Delete a disposable account and verify its local cache/outbox entries are removed best-effort after successful server deletion.
+12. Regression: direct/group text, images, reply/edit/delete/reactions, search, privacy, mute and push behavior still function online.

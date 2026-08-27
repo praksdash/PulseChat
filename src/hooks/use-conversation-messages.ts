@@ -1,12 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { useConnectivity } from '@/hooks/use-connectivity';
+
 import {
   deleteMessage,
   editMessage,
   setMessageReaction,
 } from '@/services/message-action-service';
 import { sendImageMessage } from '@/services/media-service';
+import { isRetryableNetworkError, getErrorText } from '@/services/network-error-service';
+import { cacheConversationMessages, loadCachedConversationMessages } from '@/services/offline-cache-service';
+import {
+  enqueuePendingTextMessage,
+  listPendingTextMessages,
+  removePendingTextMessage,
+  updatePendingTextFailure,
+  type PendingTextOutboxMessage,
+} from '@/services/offline-outbox-service';
 import {
   createClientMessageId,
   getMessageDetail,
@@ -221,6 +232,7 @@ function applyReceiptCursor(
       message.sender_id !== currentUserId
       || message.isOptimistic
       || message.localState === 'failed'
+      || message.localState === 'queued'
       || message.localState === 'sending'
       || new Date(message.created_at).getTime() > cutoff
     ) {
@@ -244,6 +256,36 @@ function makeReplyPreview(message: ChatMessage): ReplyPreview {
   };
 }
 
+function outboxToChatMessage(item: PendingTextOutboxMessage): ChatMessage {
+  return {
+    id: item.clientMessageId,
+    conversation_id: item.conversationId,
+    sender_id: item.userId,
+    client_message_id: item.clientMessageId,
+    message_type: 'text',
+    body: item.body,
+    reply_to_message_id: item.replyToMessageId,
+    created_at: item.createdAt,
+    edited_at: null,
+    deleted_at: null,
+    isOptimistic: true,
+    localState: 'queued',
+    replyPreview: item.replyPreview,
+    reactions: [],
+    myReaction: null,
+  };
+}
+
+function mergePendingTextMessages(current: ChatMessage[], pending: PendingTextOutboxMessage[]) {
+  return pending.reduce((messages, item) => {
+    const exists = messages.some((message) => (
+      message.client_message_id === item.clientMessageId
+      && message.sender_id === item.userId
+    ));
+    return exists ? messages : [outboxToChatMessage(item), ...messages].sort(compareNewestFirst);
+  }, current);
+}
+
 export function useConversationMessages(
   conversationId: string | undefined,
   currentUserId: string | undefined,
@@ -256,7 +298,12 @@ export function useConversationMessages(
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [realtimeState, setRealtimeState] = useState<RealtimeState>('connecting');
+  const { isOnline, checkNow: checkConnectivity } = useConnectivity();
   const mountedRef = useRef(true);
+  const messagesRef = useRef<ChatMessage[]>([]);
+  const activeConversationKeyRef = useRef<string | null>(null);
+  const sendingTextIdsRef = useRef(new Set<string>());
+  const sendingImageIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     mountedRef.current = true;
@@ -265,14 +312,18 @@ export function useConversationMessages(
     };
   }, []);
 
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   const markRead = useCallback(async () => {
-    if (!conversationId || !currentUserId || AppState.currentState !== 'active') return;
+    if (!conversationId || !currentUserId || !isOnline || AppState.currentState !== 'active') return;
     try {
       await markConversationRead(conversationId);
     } catch (error) {
       console.warn('Unable to mark conversation read:', error);
     }
-  }, [conversationId, currentUserId]);
+  }, [conversationId, currentUserId, isOnline]);
 
   const loadInitial = useCallback(async () => {
     if (!conversationId || !currentUserId) {
@@ -284,51 +335,92 @@ export function useConversationMessages(
 
     setIsInitialLoading(true);
     setLoadError(null);
+
+    const pending = await listPendingTextMessages(currentUserId, conversationId);
+
+    if (!isOnline) {
+      const cached = await loadCachedConversationMessages(currentUserId, conversationId);
+      if (!mountedRef.current) return;
+      const cachedMessages = cached?.data?.length
+        ? mergeServerMessages([], cached.data, currentUserId)
+        : [];
+      setMessages((current) => mergePendingTextMessages(current.length > 0 ? current : cachedMessages, pending));
+      setHasMore(false);
+      setIsSearchWindow(false);
+      setLoadError(cachedMessages.length > 0 || pending.length > 0
+        ? 'Offline — showing messages saved on this device.'
+        : 'You are offline and no saved messages are available yet.');
+      setIsInitialLoading(false);
+      return;
+    }
+
     try {
       const page = await listConversationMessages(conversationId);
       if (!mountedRef.current) return;
-      setMessages(mergeServerMessages([], page, currentUserId));
+      const serverMessages = mergeServerMessages([], page, currentUserId);
+      setMessages(mergePendingTextMessages(serverMessages, pending));
       setHasMore(page.length >= MESSAGE_PAGE_SIZE);
       setIsSearchWindow(false);
+      void cacheConversationMessages(currentUserId, conversationId, page);
       void markRead();
     } catch (error) {
       console.warn('Unable to load messages:', error);
-      if (mountedRef.current) setLoadError('Unable to load messages right now.');
+      const cached = await loadCachedConversationMessages(currentUserId, conversationId);
+      if (!mountedRef.current) return;
+      const cachedMessages = cached?.data?.length
+        ? mergeServerMessages([], cached.data, currentUserId)
+        : [];
+      setMessages((current) => mergePendingTextMessages(current.length > 0 ? current : cachedMessages, pending));
+      setHasMore(false);
+      setIsSearchWindow(false);
+      setLoadError(cachedMessages.length > 0 || pending.length > 0
+        ? 'Offline — showing messages saved on this device.'
+        : 'Unable to load messages right now.');
+      if (isRetryableNetworkError(error)) void checkConnectivity();
     } finally {
       if (mountedRef.current) setIsInitialLoading(false);
     }
-  }, [conversationId, currentUserId, markRead]);
+  }, [checkConnectivity, conversationId, currentUserId, isOnline, markRead]);
 
   const refreshLatest = useCallback(async () => {
-    if (!conversationId || !currentUserId) return;
+    if (!conversationId || !currentUserId || !isOnline) return;
     try {
       const page = await listConversationMessages(conversationId);
       if (!mountedRef.current) return;
       setMessages((current) => mergeServerMessages(current, page, currentUserId));
       setLoadError(null);
+      void cacheConversationMessages(currentUserId, conversationId, page);
       void markRead();
     } catch (error) {
       console.warn('Unable to reconcile latest messages:', error);
+      if (isRetryableNetworkError(error)) void checkConnectivity();
     }
-  }, [conversationId, currentUserId, markRead]);
+  }, [checkConnectivity, conversationId, currentUserId, isOnline, markRead]);
 
   const refreshOne = useCallback(async (messageId: string) => {
-    if (!currentUserId) return;
+    if (!currentUserId || !isOnline) return;
     try {
       const detail = await getMessageDetail(messageId);
       if (!detail || !mountedRef.current) return;
       setMessages((current) => mergeServerMessage(current, detail, currentUserId));
     } catch (error) {
       console.warn('Unable to refresh changed message:', error);
+      if (isRetryableNetworkError(error)) void checkConnectivity();
     }
-  }, [currentUserId]);
+  }, [checkConnectivity, currentUserId, isOnline]);
 
   useEffect(() => {
-    setMessages([]);
-    setHasMore(true);
-    setRealtimeState('connecting');
+    const conversationKey = currentUserId && conversationId
+      ? `${currentUserId}:${conversationId}`
+      : null;
+    if (activeConversationKeyRef.current !== conversationKey) {
+      activeConversationKeyRef.current = conversationKey;
+      setMessages([]);
+      setHasMore(true);
+      setRealtimeState('connecting');
+    }
     void loadInitial();
-  }, [loadInitial]);
+  }, [conversationId, currentUserId, loadInitial]);
 
   useEffect(() => {
     if (!conversationId || !currentUserId) return undefined;
@@ -371,6 +463,10 @@ export function useConversationMessages(
 
   const loadMessageSearchWindow = useCallback(async (messageId: string) => {
     if (!conversationId || !currentUserId || !messageId) return false;
+    if (!isOnline) {
+      setLoadError('Connect to the internet to open a message search result.');
+      return false;
+    }
 
     setIsInitialLoading(true);
     setLoadError(null);
@@ -394,7 +490,7 @@ export function useConversationMessages(
     } finally {
       if (mountedRef.current) setIsInitialLoading(false);
     }
-  }, [conversationId, currentUserId, markRead]);
+  }, [conversationId, currentUserId, isOnline, markRead]);
 
   const exitMessageSearchWindow = useCallback(async () => {
     await loadInitial();
@@ -402,6 +498,10 @@ export function useConversationMessages(
 
   const loadOlder = useCallback(async () => {
     if (!conversationId || !currentUserId || isLoadingOlder || !hasMore || isSearchWindow) return;
+    if (!isOnline) {
+      setLoadError('Connect to the internet to load older messages.');
+      return;
+    }
 
     const oldestServerMessage = [...messages].reverse().find((message) => !message.isOptimistic);
     if (!oldestServerMessage) {
@@ -425,7 +525,59 @@ export function useConversationMessages(
     } finally {
       if (mountedRef.current) setIsLoadingOlder(false);
     }
-  }, [conversationId, currentUserId, hasMore, isLoadingOlder, isSearchWindow, messages]);
+  }, [conversationId, currentUserId, hasMore, isLoadingOlder, isOnline, isSearchWindow, messages]);
+
+  const sendPendingText = useCallback(async (pending: PendingTextOutboxMessage) => {
+    if (!conversationId || !currentUserId || !isOnline) return;
+    if (sendingTextIdsRef.current.has(pending.clientMessageId)) return;
+
+    sendingTextIdsRef.current.add(pending.clientMessageId);
+    setMessages((current) => current.map((message) => (
+      message.client_message_id === pending.clientMessageId
+        ? { ...message, localState: 'sending' as const }
+        : message
+    )));
+
+    try {
+      const savedMessage = await sendTextMessage({
+        conversationId,
+        senderId: currentUserId,
+        clientMessageId: pending.clientMessageId,
+        body: pending.body,
+        replyToMessageId: pending.replyToMessageId,
+      });
+      await removePendingTextMessage(currentUserId, pending.clientMessageId);
+      if (!mountedRef.current) return;
+      setMessages((current) => mergeServerMessage(current, savedMessage, currentUserId));
+      if (pending.replyToMessageId) void refreshOne(savedMessage.id);
+    } catch (error) {
+      console.warn('Unable to send queued message:', error);
+      await updatePendingTextFailure(currentUserId, pending.clientMessageId, getErrorText(error));
+      const retryLater = !isOnline || isRetryableNetworkError(error);
+      if (retryLater) void checkConnectivity();
+      if (!mountedRef.current) return;
+      setMessages((current) => current.map((message) => (
+        message.client_message_id === pending.clientMessageId
+          ? { ...message, localState: retryLater ? 'queued' as const : 'failed' as const }
+          : message
+      )));
+    } finally {
+      sendingTextIdsRef.current.delete(pending.clientMessageId);
+    }
+  }, [checkConnectivity, conversationId, currentUserId, isOnline, refreshOne]);
+
+  const flushPendingText = useCallback(async () => {
+    if (!conversationId || !currentUserId) return;
+    const pending = await listPendingTextMessages(currentUserId, conversationId);
+    if (!mountedRef.current) return;
+    setMessages((current) => mergePendingTextMessages(current, pending));
+    if (!isOnline) return;
+
+    for (const item of pending) {
+      if (!mountedRef.current) return;
+      await sendPendingText(item);
+    }
+  }, [conversationId, currentUserId, isOnline, sendPendingText]);
 
   const queueTextMessage = useCallback((rawBody: string, replyTo?: ChatMessage | null) => {
     if (!conversationId || !currentUserId) return false;
@@ -434,6 +586,19 @@ export function useConversationMessages(
 
     const clientMessageId = createClientMessageId();
     const replyToMessageId = replyTo && !replyTo.deleted_at ? replyTo.id : null;
+    const replyPreview = replyToMessageId && replyTo ? makeReplyPreview(replyTo) : null;
+    const createdAt = new Date().toISOString();
+    const pending: PendingTextOutboxMessage = {
+      userId: currentUserId,
+      conversationId,
+      clientMessageId,
+      body,
+      replyToMessageId,
+      replyPreview,
+      createdAt,
+      attempts: 0,
+      lastError: null,
+    };
     const optimistic: ChatMessage = {
       id: clientMessageId,
       conversation_id: conversationId,
@@ -442,42 +607,32 @@ export function useConversationMessages(
       message_type: 'text',
       body,
       reply_to_message_id: replyToMessageId,
-      created_at: new Date().toISOString(),
+      created_at: createdAt,
       edited_at: null,
       deleted_at: null,
       isOptimistic: true,
-      localState: 'sending',
-      replyPreview: replyToMessageId && replyTo ? makeReplyPreview(replyTo) : null,
+      localState: isOnline ? 'sending' : 'queued',
+      replyPreview,
       reactions: [],
       myReaction: null,
     };
 
     setMessages((current) => [optimistic, ...current].sort(compareNewestFirst));
 
-    void sendTextMessage({
-      conversationId,
-      senderId: currentUserId,
-      clientMessageId,
-      body,
-      replyToMessageId,
-    })
-      .then((savedMessage) => {
-        if (!mountedRef.current) return;
-        setMessages((current) => mergeServerMessage(current, savedMessage, currentUserId));
-        if (replyToMessageId) void refreshOne(savedMessage.id);
-      })
-      .catch((error) => {
-        console.warn('Unable to send message:', error);
-        if (!mountedRef.current) return;
-        setMessages((current) => current.map((message) => (
-          message.client_message_id === clientMessageId
-            ? { ...message, localState: 'failed' as const }
-            : message
-        )));
-      });
+    void enqueuePendingTextMessage(pending).then(() => {
+      if (isOnline) void sendPendingText(pending);
+    }).catch((error) => {
+      console.warn('Unable to persist outgoing message:', error);
+      if (!mountedRef.current) return;
+      setMessages((current) => current.map((message) => (
+        message.client_message_id === clientMessageId
+          ? { ...message, localState: 'failed' as const }
+          : message
+      )));
+    });
 
     return true;
-  }, [conversationId, currentUserId, refreshOne]);
+  }, [conversationId, currentUserId, isOnline, sendPendingText]);
 
   const sendPendingImage = useCallback((
     clientMessageId: string,
@@ -485,6 +640,16 @@ export function useConversationMessages(
     replyToMessageId?: string | null,
   ) => {
     if (!conversationId || !currentUserId) return;
+    if (!isOnline) {
+      setMessages((current) => current.map((message) => (
+        message.client_message_id === clientMessageId
+          ? { ...message, localState: 'queued' as const, mediaSendStage: 'preparing' as const }
+          : message
+      )));
+      return;
+    }
+    if (sendingImageIdsRef.current.has(clientMessageId)) return;
+    sendingImageIdsRef.current.add(clientMessageId);
 
     void sendImageMessage({
       conversationId,
@@ -507,14 +672,23 @@ export function useConversationMessages(
       })
       .catch((error) => {
         console.warn('Unable to send image:', error);
+        const retryLater = !isOnline || isRetryableNetworkError(error);
+        if (retryLater) void checkConnectivity();
         if (!mountedRef.current) return;
         setMessages((current) => current.map((message) => (
           message.client_message_id === clientMessageId
-            ? { ...message, localState: 'failed' as const, mediaSendStage: 'failed' as const }
+            ? {
+                ...message,
+                localState: retryLater ? 'queued' as const : 'failed' as const,
+                mediaSendStage: retryLater ? 'preparing' as const : 'failed' as const,
+              }
             : message
         )));
+      })
+      .finally(() => {
+        sendingImageIdsRef.current.delete(clientMessageId);
       });
-  }, [conversationId, currentUserId]);
+  }, [checkConnectivity, conversationId, currentUserId, isOnline]);
 
   const queueImageMessage = useCallback((asset: PendingImageAsset, replyTo?: ChatMessage | null) => {
     if (!conversationId || !currentUserId) return false;
@@ -533,7 +707,7 @@ export function useConversationMessages(
       edited_at: null,
       deleted_at: null,
       isOptimistic: true,
-      localState: 'sending',
+      localState: isOnline ? 'sending' : 'queued',
       localMediaUri: asset.uri,
       pendingImageAsset: asset,
       mediaSendStage: 'preparing',
@@ -543,9 +717,25 @@ export function useConversationMessages(
     };
 
     setMessages((current) => [optimistic, ...current].sort(compareNewestFirst));
-    sendPendingImage(clientMessageId, asset, replyToMessageId);
+    if (isOnline) sendPendingImage(clientMessageId, asset, replyToMessageId);
     return true;
-  }, [conversationId, currentUserId, sendPendingImage]);
+  }, [conversationId, currentUserId, isOnline, sendPendingImage]);
+
+  useEffect(() => {
+    void flushPendingText();
+
+    if (!isOnline) return;
+    const queuedImages = messagesRef.current.filter((message) => (
+      message.message_type === 'image'
+      && message.localState === 'queued'
+      && Boolean(message.pendingImageAsset)
+    ));
+    queuedImages.forEach((message) => {
+      if (message.pendingImageAsset) {
+        sendPendingImage(message.client_message_id, message.pendingImageAsset, message.reply_to_message_id);
+      }
+    });
+  }, [flushPendingText, isOnline, sendPendingImage]);
 
   const retryMessage = useCallback((clientMessageId: string) => {
     if (!conversationId || !currentUserId) return;
@@ -555,47 +745,47 @@ export function useConversationMessages(
     if (!target) return;
 
     if (target.message_type === 'image' && target.pendingImageAsset) {
-      setMessages((current) => current.map((message) => (
-        message.client_message_id === clientMessageId
-          ? { ...message, localState: 'sending' as const, mediaSendStage: 'preparing' as const }
-          : message
-      )));
+      if (!isOnline) {
+        setMessages((current) => current.map((message) => (
+          message.client_message_id === clientMessageId
+            ? { ...message, localState: 'queued' as const, mediaSendStage: 'preparing' as const }
+            : message
+        )));
+        return;
+      }
       sendPendingImage(clientMessageId, target.pendingImageAsset, target.reply_to_message_id);
       return;
     }
 
     if (!target.body) return;
-    setMessages((current) => current.map((message) => (
-      message.client_message_id === clientMessageId
-        ? { ...message, localState: 'sending' as const }
-        : message
-    )));
-
-    void sendTextMessage({
+    const pending: PendingTextOutboxMessage = {
+      userId: currentUserId,
       conversationId,
-      senderId: currentUserId,
       clientMessageId,
       body: target.body,
       replyToMessageId: target.reply_to_message_id,
-    })
-      .then((savedMessage) => {
-        if (!mountedRef.current) return;
-        setMessages((current) => mergeServerMessage(current, savedMessage, currentUserId));
-        if (target.reply_to_message_id) void refreshOne(savedMessage.id);
-      })
-      .catch((error) => {
-        console.warn('Message retry failed:', error);
-        if (!mountedRef.current) return;
-        setMessages((current) => current.map((message) => (
-          message.client_message_id === clientMessageId
-            ? { ...message, localState: 'failed' as const }
-            : message
-        )));
-      });
-  }, [conversationId, currentUserId, messages, refreshOne, sendPendingImage]);
+      replyPreview: target.replyPreview ?? null,
+      createdAt: target.created_at,
+      attempts: 0,
+      lastError: null,
+    };
+
+    setMessages((current) => current.map((message) => (
+      message.client_message_id === clientMessageId
+        ? { ...message, localState: isOnline ? 'sending' as const : 'queued' as const }
+        : message
+    )));
+    void enqueuePendingTextMessage(pending).then(() => {
+      if (isOnline) void sendPendingText(pending);
+    });
+  }, [conversationId, currentUserId, isOnline, messages, sendPendingImage, sendPendingText]);
 
   const editMessageContent = useCallback(async (messageId: string, body: string) => {
     setActionError(null);
+    if (!isOnline) {
+      setActionError('Connect to the internet to edit messages.');
+      return false;
+    }
     try {
       await editMessage(messageId, body);
       await refreshOne(messageId);
@@ -605,10 +795,14 @@ export function useConversationMessages(
       setActionError(error instanceof Error ? error.message : 'Unable to edit this message.');
       return false;
     }
-  }, [refreshOne]);
+  }, [isOnline, refreshOne]);
 
   const deleteMessageForEveryone = useCallback(async (messageId: string) => {
     setActionError(null);
+    if (!isOnline) {
+      setActionError('Connect to the internet to delete messages.');
+      return false;
+    }
     try {
       await deleteMessage(messageId);
 
@@ -638,13 +832,17 @@ export function useConversationMessages(
       setActionError(error instanceof Error ? error.message : 'Unable to delete this message.');
       return false;
     }
-  }, [refreshOne]);
+  }, [isOnline, refreshOne]);
 
   const toggleReaction = useCallback(async (messageId: string, emoji: SupportedReaction) => {
     const target = messages.find((message) => message.id === messageId);
     if (!target || target.deleted_at || target.isOptimistic) return false;
 
     setActionError(null);
+    if (!isOnline) {
+      setActionError('Connect to the internet to react to messages.');
+      return false;
+    }
     const nextReaction = target.myReaction === emoji ? null : emoji;
     try {
       await setMessageReaction(messageId, nextReaction);
@@ -655,7 +853,7 @@ export function useConversationMessages(
       setActionError(error instanceof Error ? error.message : 'Unable to update reaction.');
       return false;
     }
-  }, [messages, refreshOne]);
+  }, [isOnline, messages, refreshOne]);
 
   return useMemo(() => ({
     messages,

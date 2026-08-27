@@ -108,3 +108,13 @@ Phase 21 will add rate limiting/abuse review, block/report enforcement, deletion
 - Web notifications re-check both account notification preferences and the caller's per-chat mute state before using the browser Notification API.
 - Account deletion is performed by `delete-account`, a server-side Edge Function. It validates the caller's bearer token, never accepts another user ID, and uses the service-role credential only inside the function runtime.
 - If a deleted account owns groups, the function captures those groups before auth deletion and assigns a remaining admin/longest-standing member as owner, or removes an empty group.
+
+## Phase 19 local/offline security
+
+- Native cached chat/message payloads and queued text are encrypted before being written to AsyncStorage; the local vault key is stored in Expo SecureStore.
+- Offline cache keys are namespaced by authenticated user ID, preventing account A's cached data from being surfaced to account B by normal app flows.
+- Local queued messages never bypass server authorization. Reconnect still executes the ordinary Supabase insert/RLS/direct-block checks.
+- `client_message_id` remains the retry idempotency boundary. Retrying a request after an uncertain network response cannot intentionally create a second message row.
+- Authorization/validation failures are not treated as connectivity failures and do not enter an automatic retry loop.
+- Permanent account deletion clears the deleted user's cached data and durable outbox on the device.
+- Browser offline storage is protected by browser origin isolation rather than Expo SecureStore; this will be reviewed again during Phase 21 security review.

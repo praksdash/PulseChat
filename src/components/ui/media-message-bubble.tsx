@@ -72,6 +72,7 @@ export function MediaMessageBubble({
 
   const statusContent = () => {
     if (!outgoing || !status) return null;
+    if (status === 'queued') return <AppText variant="micro" tone="tertiary">Waiting for connection…</AppText>;
     if (status === 'sending') return <AppText variant="micro" tone="tertiary">Sending…</AppText>;
     if (status === 'failed') {
       return (

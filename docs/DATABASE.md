@@ -191,3 +191,7 @@ The app does not receive direct table write access. `get_my_notification_prefere
 - `set_my_conversation_muted(conversation_id, muted)`
 
 Both resolve the membership row using `(conversation_id, auth.uid())`, so a group member cannot accidentally read or modify another member's mute state.
+
+## Phase 19 database impact
+
+No schema migration. PostgreSQL remains authoritative. Phase 19 relies on the existing unique sender/client-message constraint for idempotent retry and uses local device persistence only as a temporary cache/outbox.

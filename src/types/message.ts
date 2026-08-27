@@ -8,7 +8,7 @@ export type MessagePageRow = MessagePageDatabaseRow & {
 };
 
 export type MessageDeliveryStatus = 'sent' | 'delivered' | 'read';
-export type MessageLocalState = 'sending' | MessageDeliveryStatus | 'failed';
+export type MessageLocalState = 'queued' | 'sending' | MessageDeliveryStatus | 'failed';
 export type MediaSendStage = 'preparing' | 'uploading' | 'committing' | 'ready' | 'failed';
 export type SupportedReaction = '👍' | '❤️' | '😂' | '😮' | '😢' | '🙏';
 

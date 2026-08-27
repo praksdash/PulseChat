@@ -27,6 +27,7 @@ import {
   ReportModal,
 } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
+import { useConnectivity } from '@/hooks/use-connectivity';
 import { useConversationMessages } from '@/hooks/use-conversation-messages';
 import { usePeerPresence } from '@/hooks/use-peer-presence';
 import { useTypingIndicator } from '@/hooks/use-typing-indicator';
@@ -35,6 +36,7 @@ import { subscribeToGroupMembershipEvents } from '@/services/group-membership-ev
 import { getGroupAvatarPublicUrl } from '@/services/group-service';
 import { chooseChatImageFromLibrary, takeChatPhoto } from '@/services/media-service';
 import { MAX_TEXT_MESSAGE_LENGTH } from '@/services/message-service';
+import { cacheConversationSummary, loadCachedConversationSummary } from '@/services/offline-cache-service';
 import { setActivePushConversation } from '@/services/push-notification-service';
 import { getMyConversationNotificationState, setMyConversationMuted } from '@/services/settings-service';
 import { getAvatarPublicUrl } from '@/services/profile-service';
@@ -88,6 +90,7 @@ function getReplyText(reply: ReplyPreview | ChatMessage | null | undefined) {
 export default function ConversationScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
+  const { isOnline } = useConnectivity();
   const params = useLocalSearchParams<{
     conversationId?: string | string[];
     name?: string | string[];
@@ -140,7 +143,9 @@ export default function ConversationScreen() {
   } = useConversationMessages(conversationId, user?.id);
 
   const isDirectConversation = summary?.kind === 'direct';
-  const directMessagingAvailable = !isDirectConversation || relationship?.messaging_available === true;
+  const directMessagingAvailable = !isDirectConversation
+    || relationship?.messaging_available === true
+    || (!isOnline && relationship === null);
   const canObservePeerActivity = Boolean(isDirectConversation && relationship?.can_view_activity);
   const peerPresence = usePeerPresence(
     isDirectConversation ? summary?.peer_user_id : undefined,
@@ -149,7 +154,7 @@ export default function ConversationScreen() {
   const { peerTyping, updateTyping, stopTyping } = useTypingIndicator({
     conversationId,
     currentUserId: user?.id,
-    enabled: Boolean(isDirectConversation && relationship?.messaging_available),
+    enabled: Boolean(isOnline && isDirectConversation && relationship?.messaging_available),
   });
 
   const loadSummary = useCallback(async () => {
@@ -161,29 +166,53 @@ export default function ConversationScreen() {
 
     setIsLoadingSummary(true);
     setSummaryError(null);
+
+    if (!isOnline) {
+      const cached = user?.id ? await loadCachedConversationSummary(user.id, conversationId) : null;
+      if (cached?.data) {
+        setSummary(cached.data);
+        setRelationship(null);
+        setSummaryError(null);
+      } else {
+        setSummaryError('You are offline and this conversation has not been saved on this device yet.');
+      }
+      setIsLoadingSummary(false);
+      return;
+    }
+
     try {
       const data = await getConversationSummary(conversationId);
       setSummary(data);
       if (!data) {
         setRelationship(null);
         setSummaryError('This conversation is unavailable or you are no longer a member.');
-      } else if (data.kind === 'direct' && data.peer_user_id) {
-        try {
-          setRelationship(await getUserRelationshipState(data.peer_user_id));
-        } catch (relationshipError) {
-          console.warn('Unable to load direct privacy state:', relationshipError);
+      } else {
+        if (user?.id) void cacheConversationSummary(user.id, conversationId, data);
+        if (data.kind === 'direct' && data.peer_user_id) {
+          try {
+            setRelationship(await getUserRelationshipState(data.peer_user_id));
+          } catch (relationshipError) {
+            console.warn('Unable to load direct privacy state:', relationshipError);
+            setRelationship(null);
+          }
+        } else {
           setRelationship(null);
         }
-      } else {
-        setRelationship(null);
       }
     } catch (error) {
       console.warn('Unable to load conversation:', error);
-      setSummaryError('Unable to load this conversation right now.');
+      const cached = user?.id ? await loadCachedConversationSummary(user.id, conversationId) : null;
+      if (cached?.data) {
+        setSummary(cached.data);
+        setRelationship(null);
+        setSummaryError(null);
+      } else {
+        setSummaryError('Unable to load this conversation right now.');
+      }
     } finally {
       setIsLoadingSummary(false);
     }
-  }, [conversationId]);
+  }, [conversationId, isOnline, user?.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -191,9 +220,13 @@ export default function ConversationScreen() {
     }, [loadSummary]),
   );
 
+  useEffect(() => {
+    if (isOnline) void loadSummary();
+  }, [isOnline, loadSummary]);
+
   useFocusEffect(
     useCallback(() => {
-      if (!conversationId) return undefined;
+      if (!conversationId || !isOnline) return undefined;
       let active = true;
       void getMyConversationNotificationState(conversationId)
         .then((state) => {
@@ -205,7 +238,7 @@ export default function ConversationScreen() {
       return () => {
         active = false;
       };
-    }, [conversationId]),
+    }, [conversationId, isOnline]),
   );
 
   useFocusEffect(
@@ -276,6 +309,7 @@ export default function ConversationScreen() {
   const canAttach = Boolean(summary && user?.id && directMessagingAvailable && !editingMessage);
 
   const headerSubtitle = useMemo(() => {
+    if (!isOnline) return 'Offline · messages will queue';
     if (realtimeState !== 'connected') return 'Reconnecting…';
     if (isDirectConversation && !relationship) return 'Checking privacy…';
     if (isDirectConversation && relationship?.blocked_by_me) return 'Blocked';
@@ -289,6 +323,7 @@ export default function ConversationScreen() {
       : (summary?.username ? `@${summary.username}` : 'direct chat');
   }, [
     isDirectConversation,
+    isOnline,
     peerPresence.lastSeenAt,
     peerPresence.online,
     peerTyping,
@@ -607,6 +642,10 @@ export default function ConversationScreen() {
 
   const toggleConversationMute = async () => {
     if (!conversationId || isUpdatingMute) return;
+    if (!isOnline) {
+      setMuteError('Connect to the internet to change notification settings.');
+      return;
+    }
     const nextMuted = !isMuted;
     setIsUpdatingMute(true);
     setMuteError(null);
@@ -645,7 +684,7 @@ export default function ConversationScreen() {
               style={[
                 styles.statusDot,
                 {
-                  backgroundColor: realtimeState !== 'connected'
+                  backgroundColor: !isOnline || realtimeState !== 'connected'
                     ? theme.colors.warning
                     : (canObservePeerActivity && peerPresence.online ? theme.colors.online : theme.colors.textTertiary),
                 },

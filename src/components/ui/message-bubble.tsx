@@ -7,7 +7,7 @@ import { MessageReplyPreview } from './message-reply-preview';
 import { useAppTheme } from '@/theme';
 import type { MessageReactionSummary, SupportedReaction } from '@/types/message';
 
-type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+type MessageStatus = 'queued' | 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 
 type MessageBubbleProps = {
   text: string;
@@ -42,6 +42,7 @@ export function MessageBubble({
 
   const statusContent = () => {
     if (!outgoing || !status) return null;
+    if (status === 'queued') return <AppText variant="micro" tone="tertiary">Waiting for connection…</AppText>;
     if (status === 'sending') return <AppText variant="micro" tone="tertiary">Sending…</AppText>;
     if (status === 'failed') {
       return (

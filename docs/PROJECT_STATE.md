@@ -141,3 +141,23 @@ Verify Phase 18 settings. After acceptance, Phase 19 — offline/error handling.
 ## Phase 18 Edge Functions
 - redeploy `send-message-push`
 - deploy `delete-account`
+
+## Phase 19 implementation
+- Backend connectivity provider with online/offline health probes and foreground rechecks.
+- Global offline status banner and manual connection retry.
+- Recent Chats/conversation/message cache for graceful offline reads.
+- Native cache and text outbox encrypted before AsyncStorage persistence with key material in Expo SecureStore.
+- Durable offline text outbox automatically flushes on reconnect using the existing `client_message_id` dedup contract.
+- Offline/session image queue retries automatically when connectivity returns; image URI persistence across killed app processes is intentionally not claimed.
+- Retryable network failures return outgoing messages to queued state; server authorization/validation failures remain explicit failures.
+- Network-required message mutations provide clear user-facing errors.
+- Account deletion clears local offline state.
+
+## Phase 19 migration
+None.
+
+## Phase 19 verification
+Run `npm run typecheck`, then perform the offline/reconnect acceptance test in `docs/TESTING.md` on a real Android device and web.
+
+## Next task
+After Phase 19 acceptance: Phase 20 — performance optimization.

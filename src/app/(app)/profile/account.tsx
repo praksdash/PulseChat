@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppButton, AppIcon, AppText, ConfirmActionModal, SurfaceCard } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { deleteMyAccount } from '@/services/account-service';
+import { clearUserOfflineCache } from '@/services/offline-cache-service';
+import { clearPendingTextMessages } from '@/services/offline-outbox-service';
 import { useAppTheme } from '@/theme';
 
 export default function AccountSettingsScreen() {
@@ -34,6 +36,12 @@ export default function AccountSettingsScreen() {
     setIsDeleting(true);
     try {
       await deleteMyAccount();
+      if (user?.id) {
+        await Promise.allSettled([
+          clearUserOfflineCache(user.id),
+          clearPendingTextMessages(user.id),
+        ]);
+      }
       setShowDelete(false);
       const signOutError = await signOut();
       if (signOutError) {
