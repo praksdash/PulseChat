@@ -145,3 +145,33 @@ Typing/presence is Phase 11; media is Phase 12.
 8. Delete a message that matched the query; rerun search and confirm it disappears.
 9. Remove a user from a group and confirm old group message results/window access are denied on a fresh search/open.
 10. Regression: people discovery, direct/group chat, realtime, media, replies/edits/deletes/reactions, receipts, presence and push notifications still operate.
+
+
+## Phase 17 block/report/privacy manual tests
+1. Run `supabase/phase17_verify.sql`; all three tables exist with RLS, authenticated RPC execute is true, anon execute is false, and clients cannot browse reports.
+2. Account A searches B, opens B's profile and blocks B. Confirm B disappears from A's people search and A disappears from B's people search.
+3. In the existing A/B direct chat, both clients can read history but neither can send a new text or image. The composer shows the privacy state.
+4. While blocked, confirm typing and online/last-seen are not exposed between A and B.
+5. Background B, attempt/direct-message race around the block and confirm no new direct push is delivered after the block.
+6. A unblocks B from Profile > Privacy & security > Blocked users. Existing A/B chat can send again.
+7. B disables “Allow new direct chats”. A user with no existing direct conversation cannot create one; an existing direct conversation remains usable.
+8. B disables “Appear in people search”. A user without a shared conversation cannot discover B through People search; users already sharing a conversation can still access the safe profile through the conversation.
+9. B disables “Show online & last seen”. A shared-conversation peer sees activity hidden and cannot read B's last-seen through the RPC.
+10. Report a profile and an incoming message. Confirm submission succeeds, duplicate submission is idempotent, and authenticated clients cannot query `public.reports` directly.
+11. Put A and B in the same group, block one another, and confirm group history/group messages still work for both while direct messaging remains closed.
+12. Regression: search, direct/group chat, media, replies/edits/deletes/reactions, receipts, notifications and group administration still work.
+
+## Phase 18 settings manual tests
+1. Run `supabase/phase18_verify.sql`; notification preference table/RLS and four settings RPC checks should pass.
+2. Profile → Settings → Appearance: switch System → Dark → Light. The full app changes immediately; restart PulseChat and confirm the chosen mode persists.
+3. Set Appearance=System, change the OS/browser color scheme and confirm PulseChat follows it.
+4. Disable Direct messages in Notifications. Background the Android receiver and send a direct message from another account; no remote notification should arrive, while the durable message/unread count still appears in-app.
+5. Re-enable Direct messages and disable Group messages. Send a group message; no group push should arrive.
+6. Disable Message previews, send a background message and confirm the notification only says PulseChat / New message (or New group message), without sender/message preview content.
+7. On web, disable Browser notifications. Leave PulseChat in a background tab and send a message; no browser alert should appear. Re-enable it and verify the alert returns.
+8. Open a direct conversation, tap the bell to mute it, background the receiver and send a message; no notification should arrive for that chat. Unmute and verify delivery resumes.
+9. Repeat per-chat mute with a group containing 3+ members. Confirm only the current user's membership is muted; other members still receive notifications according to their own settings.
+10. Refresh/reopen a muted group and confirm the bell state remains muted.
+11. Profile → Settings → Account → Sign out; the authenticated app is left and push registration is disabled as before.
+12. With a disposable test account, create/own a group with another member, then Delete account. Confirm the account can no longer sign in, its profile is gone, and the group remains with another owner. If the deleted account was the only group member, the empty group should be removed.
+13. Regression: direct/group messaging, images, replies, edits, deletes, reactions, search, block/report/privacy, receipts, presence and push tests continue to work.

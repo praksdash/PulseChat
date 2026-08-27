@@ -66,34 +66,13 @@ export default function ProfileScreen() {
         />
 
         <View style={styles.section}>
-          <AppText variant="captionStrong" tone="secondary" style={styles.sectionTitle}>ACCOUNT</AppText>
+          <AppText variant="captionStrong" tone="secondary" style={styles.sectionTitle}>SETTINGS</AppText>
           <SurfaceCard style={styles.settingsCard}>
             <SettingsRow
-              icon={{ ios: 'person.fill', android: 'person', web: 'person' }}
-              title="Account"
-              subtitle="Edit name, username, photo and bio"
-              onPress={() => router.push('/profile/edit')}
-            />
-            <SettingsRow
-              icon={{ ios: 'envelope.fill', android: 'mail', web: 'mail' }}
-              title="Email"
-              subtitle={user?.email ?? 'No email available'}
-            />
-            <SettingsRow
-              icon={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }}
-              title="Notifications"
-              subtitle="Phone & web notification settings"
-              onPress={() => router.push('/profile/notifications')}
-            />
-            <SettingsRow
-              icon={{ ios: 'paintpalette.fill', android: 'palette', web: 'palette' }}
-              title="Appearance"
-              subtitle={theme.isDark ? 'System dark theme active' : 'System light theme active'}
-            />
-            <SettingsRow
-              icon={{ ios: 'shield.fill', android: 'shield', web: 'shield' }}
-              title="Privacy & security"
-              subtitle="RLS-backed account access enabled"
+              icon={{ ios: 'gearshape.fill', android: 'settings', web: 'settings' }}
+              title="Settings"
+              subtitle="Appearance, notifications, privacy and account"
+              onPress={() => router.push('/profile/settings')}
               last
             />
           </SurfaceCard>

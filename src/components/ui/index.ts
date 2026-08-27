@@ -8,6 +8,7 @@ export * from './empty-state';
 export * from './message-bubble';
 export * from './search-bar';
 export * from './settings-row';
+export * from './settings-toggle-row';
 export * from './surface-card';
 export * from './user-row';
 export * from './attachment-picker-modal';
@@ -19,3 +20,5 @@ export * from './message-actions-modal';
 
 export * from './confirm-action-modal';
 export * from './message-search-row';
+
+export * from './report-modal';

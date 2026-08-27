@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthLoadingScreen } from '@/components/auth';
 import { useAuth } from '@/hooks/use-auth';
 import { AuthProvider } from '@/providers/auth-provider';
-import { useAppTheme } from '@/theme';
+import { ThemeProvider, useAppTheme } from '@/theme';
 
 function RootNavigator() {
   const theme = useAppTheme();
@@ -37,8 +37,10 @@ function RootNavigator() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <RootNavigator />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <RootNavigator />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

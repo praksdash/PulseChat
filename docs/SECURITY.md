@@ -88,3 +88,23 @@ Phase 21 will add rate limiting/abuse review, block/report enforcement, deletion
 - Deleted messages are excluded from `search_my_messages()`.
 - LIKE wildcard characters in caller input are escaped server-side and search length/result counts are bounded.
 - Search never returns auth email, phone, push token, or other private account metadata.
+
+
+## Phase 17 block/report/privacy security
+- Block enforcement is server-side. A modified client cannot bypass a block by directly inserting a text message or calling the image-message RPC.
+- New chat creation rejects blocked pairs and respects the target user's new-direct-chat preference.
+- Private Realtime presence/typing and direct conversation Broadcast authorization deny blocked pairs.
+- Last-seen RPC access respects activity visibility and pair blocks.
+- Chat-media uploads require the caller to still be allowed to send in that conversation; historical media reads remain membership-authorized.
+- People discovery filters blocks and non-discoverable profiles server-side.
+- Report rows are not client-readable and cannot be directly inserted by authenticated clients. The reporting RPC derives the reporter from `auth.uid()` and verifies message membership/sender identity.
+- The push dispatcher checks direct blocks immediately before delivery as defense in depth against block/message webhook races.
+
+## Phase 18 settings security
+
+- Notification preferences are server-enforced by `send-message-push`; hiding a client switch cannot bypass them.
+- Message-preview privacy is applied inside the Edge Function before payloads are sent to Expo. When previews are disabled, the push payload contains no message body/sender preview text.
+- Per-chat mute RPCs derive the user from `auth.uid()` and never accept a target user ID.
+- Web notifications re-check both account notification preferences and the caller's per-chat mute state before using the browser Notification API.
+- Account deletion is performed by `delete-account`, a server-side Edge Function. It validates the caller's bearer token, never accepts another user ID, and uses the service-role credential only inside the function runtime.
+- If a deleted account owns groups, the function captures those groups before auth deletion and assigns a remaining admin/longest-standing member as owner, or removes an empty group.

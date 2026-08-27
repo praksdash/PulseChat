@@ -25,6 +25,14 @@ type PushTokenRow = {
 
 type PushClaimRow = PushTokenRow;
 
+type NotificationPreferenceRow = {
+  user_id: string;
+  direct_messages: boolean;
+  group_messages: boolean;
+  show_message_preview: boolean;
+};
+
+
 type ExpoPushTicket = {
   status?: 'ok' | 'error';
   id?: string;
@@ -292,7 +300,7 @@ async function dispatchMessage(messageId: string) {
   if (membersError) throw new Error(`Unable to load recipients: ${membersError.message}`);
 
   const now = Date.now();
-  const recipientIds = (memberships ?? [])
+  let recipientIds = (memberships ?? [])
     .filter((member) => {
       if (!member.muted_until) return true;
       const until = new Date(member.muted_until).getTime();
@@ -301,6 +309,59 @@ async function dispatchMessage(messageId: string) {
     .map((member) => member.user_id);
 
   if (recipientIds.length === 0) return { sent: 0, skipped: 'no recipients' };
+
+  // Phase 17 defense in depth: a direct block in either direction suppresses
+  // push even if the message was committed immediately before the block.
+  if (conversation.kind === 'direct') {
+    const [blockedBySenderResult, blockedSenderResult] = await Promise.all([
+      admin
+        .from('blocked_users')
+        .select('blocked_user_id')
+        .eq('blocker_id', message.sender_id)
+        .in('blocked_user_id', recipientIds),
+      admin
+        .from('blocked_users')
+        .select('blocker_id')
+        .eq('blocked_user_id', message.sender_id)
+        .in('blocker_id', recipientIds),
+    ]);
+
+    if (blockedBySenderResult.error) {
+      throw new Error(`Unable to check sender blocks: ${blockedBySenderResult.error.message}`);
+    }
+    if (blockedSenderResult.error) {
+      throw new Error(`Unable to check recipient blocks: ${blockedSenderResult.error.message}`);
+    }
+
+    const blockedRecipients = new Set<string>();
+    for (const row of blockedBySenderResult.data ?? []) {
+      if (row.blocked_user_id) blockedRecipients.add(row.blocked_user_id);
+    }
+    for (const row of blockedSenderResult.data ?? []) {
+      if (row.blocker_id) blockedRecipients.add(row.blocker_id);
+    }
+    recipientIds = recipientIds.filter((userId) => !blockedRecipients.has(userId));
+    if (recipientIds.length === 0) return { sent: 0, skipped: 'blocked direct relationship' };
+  }
+
+  const { data: preferenceRows, error: preferenceError } = await admin
+    .from('notification_preferences')
+    .select('user_id, direct_messages, group_messages, show_message_preview')
+    .in('user_id', recipientIds);
+
+  if (preferenceError) throw new Error(`Unable to load notification preferences: ${preferenceError.message}`);
+
+  const preferencesByUser = new Map<string, NotificationPreferenceRow>();
+  for (const row of (preferenceRows ?? []) as NotificationPreferenceRow[]) {
+    preferencesByUser.set(row.user_id, row);
+  }
+
+  recipientIds = recipientIds.filter((userId) => {
+    const preference = preferencesByUser.get(userId);
+    if (!preference) return true; // Default-on for accounts created before Phase 18.
+    return conversation.kind === 'direct' ? preference.direct_messages : preference.group_messages;
+  });
+  if (recipientIds.length === 0) return { sent: 0, skipped: 'disabled by notification preferences' };
 
   const [{ data: tokens, error: tokensError }, { data: unreadRows, error: unreadError }] = await Promise.all([
     admin
@@ -336,7 +397,7 @@ async function dispatchMessage(messageId: string) {
     }
   }
 
-  const copy = getNotificationCopy({
+  const previewCopy = getNotificationCopy({
     kind: conversation.kind,
     groupTitle: conversation.title,
     senderName: senderProfile?.display_name?.trim() || 'PulseChat User',
@@ -347,6 +408,11 @@ async function dispatchMessage(messageId: string) {
   const notificationByToken = new Map<string, ExpoPushMessage>();
   for (const claim of claimed) {
     const unreadCount = unreadByUser.get(claim.user_id) ?? 0;
+    const preference = preferencesByUser.get(claim.user_id);
+    const showPreview = preference?.show_message_preview ?? true;
+    const copy = showPreview
+      ? previewCopy
+      : { title: 'PulseChat', body: conversation.kind === 'group' ? 'New group message' : 'New message' };
     notificationByToken.set(claim.expo_push_token, {
       to: claim.expo_push_token,
       sound: 'default',

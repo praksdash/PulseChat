@@ -341,8 +341,13 @@ export default function GroupInfoScreen() {
                     <RoleBadge role={member.role} />
                   </View>
                   <AppText variant="caption" tone="secondary">{member.username ? `@${member.username}` : 'PulseChat user'}</AppText>
-                  {(canChangeRole || canRemove || canTransfer) ? (
+                  {(!member.is_self || canChangeRole || canRemove || canTransfer) ? (
                     <View style={styles.memberActions}>
+                      {!member.is_self ? (
+                        <Pressable onPress={() => router.push({ pathname: '/users/[userId]', params: { userId: member.user_id } })}>
+                          <AppText variant="micro" tone="primary">View profile</AppText>
+                        </Pressable>
+                      ) : null}
                       {canChangeRole ? (
                         <Pressable disabled={busyMemberId === member.user_id} onPress={() => void changeRole(member)}>
                           <AppText variant="micro" tone="primary">{member.role === 'admin' ? 'Remove admin' : 'Make admin'}</AppText>

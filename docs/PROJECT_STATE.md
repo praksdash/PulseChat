@@ -1,7 +1,7 @@
 # PulseChat Project State
 
 ## Current phase
-Phase 16 — search
+Phase 18 — settings (implementation ready; verification pending)
 
 ## Completed
 - Phase 0 product scope/architecture
@@ -21,6 +21,7 @@ Phase 16 — search
 - Phase 14 group chats
 - Phase 15 push notifications + Android/web notification diagnostics
 - Phase 16 global search
+- Phase 17 block/report/privacy
 
 ## Phase 15 implementation
 - `expo-notifications` SDK 57 integration
@@ -70,14 +71,14 @@ Phase 16 — search
 ## Known limitations
 - Phase 15 sends notifications for newly inserted messages only; edits/deletes/reactions do not create a second push.
 - Expo push receipts are not polled asynchronously yet; immediate ticket failures are logged/handled. Receipt polling and operational alerting belong in Phase 26 hardening.
-- Notification preference/mute UI is deferred to Phase 18; the dispatcher already honors `conversation_members.muted_until` if set.
+- Phase 18 now exposes account-wide notification preferences and secure per-chat mute controls; the dispatcher enforces both.
 - iOS client code is included, but iOS credentials/device testing remain part of the later iOS production phase.
 
 ## Git checkpoint
 `feat: add secure push notifications`
 
 ## Next task
-Phase 17 — block/report/privacy.
+Verify Phase 18 settings. After acceptance, Phase 19 — offline/error handling.
 - Phase 15 hotfix: Android notification channel no longer passes `sound: "default"` as a custom sound filename; system notification sound behavior is used instead.
 
 ## Phase 15 notification completion fix
@@ -101,3 +102,42 @@ Phase 17 — block/report/privacy.
 
 ## Verification
 `supabase/phase16_verify.sql`
+
+
+## Phase 17 implementation
+- `user_privacy_settings` stores people-search visibility, new-direct-chat permission and activity visibility.
+- `blocked_users` stores directional blocks; a block in either direction closes direct messaging for the pair.
+- Direct text/image sends are enforced at PostgreSQL/RLS/trigger boundaries, not only in the UI.
+- Blocked direct pairs cannot create/reopen a direct chat through the creation RPC, exchange typing, observe online/last-seen, or receive new direct-message push delivery.
+- People discovery excludes users when either side has blocked the other and respects `discoverable_by_search`.
+- Existing direct history remains readable after blocking. Shared groups remain intact and group history continues to follow group membership.
+- `reports` is a private moderation table; normal authenticated clients cannot browse or directly insert into it.
+- Users can report a profile or a specific incoming message through `report_user_or_message()`.
+- Profile > Privacy & security exposes all privacy switches plus blocked-user management.
+- Public profile and group member views provide access to block/report controls.
+
+## Phase 17 migration
+`supabase/migrations/202608160015_phase17_block_report_privacy.sql`
+
+## Phase 17 verification
+`supabase/phase17_verify.sql`
+
+
+## Phase 18 implementation
+- Settings hub with Appearance, Notifications, Privacy & security, and Account.
+- Device-local System/Light/Dark theme preference via `ThemeProvider` + AsyncStorage.
+- `notification_preferences` table and caller-scoped get/update RPCs.
+- Server-enforced direct/group notification switches and message-preview privacy.
+- Web browser alerts use the same preferences.
+- Per-chat bell control backed by secure `conversation_members.muted_until` RPCs.
+- Permanent account deletion through `delete-account`, including owned-group repair and avatar cleanup.
+
+## Phase 18 migration
+`supabase/migrations/202608270016_phase18_settings.sql`
+
+## Phase 18 verification
+`supabase/phase18_verify.sql`
+
+## Phase 18 Edge Functions
+- redeploy `send-message-push`
+- deploy `delete-account`

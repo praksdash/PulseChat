@@ -24,6 +24,7 @@ import {
   MediaViewer,
   MessageActionsModal,
   MessageBubble,
+  ReportModal,
 } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { useConversationMessages } from '@/hooks/use-conversation-messages';
@@ -35,10 +36,13 @@ import { getGroupAvatarPublicUrl } from '@/services/group-service';
 import { chooseChatImageFromLibrary, takeChatPhoto } from '@/services/media-service';
 import { MAX_TEXT_MESSAGE_LENGTH } from '@/services/message-service';
 import { setActivePushConversation } from '@/services/push-notification-service';
+import { getMyConversationNotificationState, setMyConversationMuted } from '@/services/settings-service';
 import { getAvatarPublicUrl } from '@/services/profile-service';
+import { getUserRelationshipState, reportUserOrMessage } from '@/services/privacy-service';
 import { useAppTheme } from '@/theme';
 import type { ConversationSummary } from '@/types/conversation';
 import type { ChatMessage, ReplyPreview, SupportedReaction } from '@/types/message';
+import type { ReportReason, UserRelationshipState } from '@/types/privacy';
 
 function formatMessageTime(iso: string) {
   const date = new Date(iso);
@@ -100,8 +104,13 @@ export default function ConversationScreen() {
   const [draft, setDraft] = useState('');
   const [attachmentMenuVisible, setAttachmentMenuVisible] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [muteError, setMuteError] = useState<string | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isUpdatingMute, setIsUpdatingMute] = useState(false);
   const [viewer, setViewer] = useState<{ uri: string; caption: string | null } | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
+  const [reportTarget, setReportTarget] = useState<ChatMessage | null>(null);
+  const [relationship, setRelationship] = useState<UserRelationshipState | null>(null);
   const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [isDeletingMessage, setIsDeletingMessage] = useState(false);
@@ -131,14 +140,16 @@ export default function ConversationScreen() {
   } = useConversationMessages(conversationId, user?.id);
 
   const isDirectConversation = summary?.kind === 'direct';
+  const directMessagingAvailable = !isDirectConversation || relationship?.messaging_available === true;
+  const canObservePeerActivity = Boolean(isDirectConversation && relationship?.can_view_activity);
   const peerPresence = usePeerPresence(
     isDirectConversation ? summary?.peer_user_id : undefined,
-    Boolean(isDirectConversation),
+    canObservePeerActivity,
   );
   const { peerTyping, updateTyping, stopTyping } = useTypingIndicator({
     conversationId,
     currentUserId: user?.id,
-    enabled: Boolean(isDirectConversation),
+    enabled: Boolean(isDirectConversation && relationship?.messaging_available),
   });
 
   const loadSummary = useCallback(async () => {
@@ -153,7 +164,19 @@ export default function ConversationScreen() {
     try {
       const data = await getConversationSummary(conversationId);
       setSummary(data);
-      if (!data) setSummaryError('This conversation is unavailable or you are no longer a member.');
+      if (!data) {
+        setRelationship(null);
+        setSummaryError('This conversation is unavailable or you are no longer a member.');
+      } else if (data.kind === 'direct' && data.peer_user_id) {
+        try {
+          setRelationship(await getUserRelationshipState(data.peer_user_id));
+        } catch (relationshipError) {
+          console.warn('Unable to load direct privacy state:', relationshipError);
+          setRelationship(null);
+        }
+      } else {
+        setRelationship(null);
+      }
     } catch (error) {
       console.warn('Unable to load conversation:', error);
       setSummaryError('Unable to load this conversation right now.');
@@ -168,6 +191,22 @@ export default function ConversationScreen() {
     }, [loadSummary]),
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!conversationId) return undefined;
+      let active = true;
+      void getMyConversationNotificationState(conversationId)
+        .then((state) => {
+          if (active) setIsMuted(state.is_muted);
+        })
+        .catch((error) => {
+          if (active) setMuteError(error instanceof Error ? error.message : 'Unable to read notification state.');
+        });
+      return () => {
+        active = false;
+      };
+    }, [conversationId]),
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -233,11 +272,15 @@ export default function ConversationScreen() {
   );
   const canSend = editingMessage
     ? canSaveEdit
-    : Boolean(summary && user?.id && normalizedDraft.length > 0);
-  const canAttach = Boolean(summary && user?.id && !editingMessage);
+    : Boolean(summary && user?.id && directMessagingAvailable && normalizedDraft.length > 0);
+  const canAttach = Boolean(summary && user?.id && directMessagingAvailable && !editingMessage);
 
   const headerSubtitle = useMemo(() => {
     if (realtimeState !== 'connected') return 'Reconnecting…';
+    if (isDirectConversation && !relationship) return 'Checking privacy…';
+    if (isDirectConversation && relationship?.blocked_by_me) return 'Blocked';
+    if (isDirectConversation && relationship?.messaging_available === false) return 'Messaging unavailable';
+    if (isDirectConversation && !relationship?.can_view_activity) return 'Activity hidden';
     if (isDirectConversation && peerTyping) return 'typing…';
     if (isDirectConversation && peerPresence.online) return 'online';
     if (isDirectConversation) return formatLastSeen(peerPresence.lastSeenAt);
@@ -250,6 +293,7 @@ export default function ConversationScreen() {
     peerPresence.online,
     peerTyping,
     realtimeState,
+    relationship,
     summary?.kind,
     summary?.member_count,
     summary?.username,
@@ -374,6 +418,23 @@ export default function ConversationScreen() {
     const target = selectedMessage;
     setSelectedMessage(null);
     if (target) void toggleReaction(target.id, emoji);
+  };
+
+  const reportFromActions = () => {
+    if (!selectedMessage || !selectedMessage.sender_id || selectedMessage.sender_id === user?.id) return;
+    setReportTarget(selectedMessage);
+    setSelectedMessage(null);
+  };
+
+  const submitMessageReport = async (reason: ReportReason, details: string) => {
+    if (!reportTarget?.sender_id) return;
+    await reportUserOrMessage({
+      userId: reportTarget.sender_id,
+      reason,
+      details,
+      messageId: reportTarget.id,
+    });
+    setReportTarget(null);
   };
 
   const replyLabel = (reply: ReplyPreview | null | undefined) => {
@@ -544,6 +605,21 @@ export default function ConversationScreen() {
     );
   };
 
+  const toggleConversationMute = async () => {
+    if (!conversationId || isUpdatingMute) return;
+    const nextMuted = !isMuted;
+    setIsUpdatingMute(true);
+    setMuteError(null);
+    try {
+      const state = await setMyConversationMuted(conversationId, nextMuted);
+      setIsMuted(state.is_muted);
+    } catch (error) {
+      setMuteError(error instanceof Error ? error.message : 'Unable to update notification state.');
+    } finally {
+      setIsUpdatingMute(false);
+    }
+  };
+
   const contextMessage = editingMessage ?? replyTarget;
   const contextTitle = editingMessage
     ? (editingMessage.message_type === 'image' ? 'Edit photo caption' : 'Edit message')
@@ -553,6 +629,7 @@ export default function ConversationScreen() {
         : (summary?.kind === 'group' ? (replyTarget.senderDisplayName ?? 'group member') : name)}`
       : null;
   const contextText = contextMessage ? getReplyText(contextMessage) : null;
+  const peerUserId = summary?.kind === 'direct' ? summary.peer_user_id : null;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top', 'bottom']}>
@@ -560,7 +637,7 @@ export default function ConversationScreen() {
         <Pressable accessibilityRole="button" accessibilityLabel="Back to chats" hitSlop={10} onPress={() => router.back()} style={styles.roundButton}>
           <AppIcon name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={24} color={theme.colors.primary} />
         </Pressable>
-        <Avatar name={name} uri={avatarUri} size={38} online={isDirectConversation && peerPresence.online} />
+        <Avatar name={name} uri={avatarUri} size={38} online={canObservePeerActivity && peerPresence.online} />
         <View style={styles.headerCopy}>
           <AppText variant="bodyStrong" numberOfLines={1}>{name}</AppText>
           <View style={styles.subtitleRow}>
@@ -570,7 +647,7 @@ export default function ConversationScreen() {
                 {
                   backgroundColor: realtimeState !== 'connected'
                     ? theme.colors.warning
-                    : (isDirectConversation && peerPresence.online ? theme.colors.online : theme.colors.textTertiary),
+                    : (canObservePeerActivity && peerPresence.online ? theme.colors.online : theme.colors.textTertiary),
                 },
               ]}
             />
@@ -578,11 +655,33 @@ export default function ConversationScreen() {
           </View>
         </View>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={isMuted ? 'Unmute this chat' : 'Mute this chat'}
+          accessibilityState={{ disabled: isUpdatingMute }}
+          disabled={!summary || isUpdatingMute}
+          hitSlop={10}
+          onPress={() => void toggleConversationMute()}
+          style={styles.roundButton}>
+          {isUpdatingMute ? (
+            <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+          ) : (
+            <AppIcon
+              name={isMuted
+                ? { ios: 'bell.slash.fill', android: 'notifications_off', web: 'notifications_off' }
+                : { ios: 'bell.fill', android: 'notifications', web: 'notifications' }}
+              size={20}
+              color={isMuted ? theme.colors.textTertiary : theme.colors.textSecondary}
+            />
+          )}
+        </Pressable>
+        <Pressable
           accessibilityLabel={summary?.kind === 'group' ? 'Open group info' : 'Conversation options'}
           hitSlop={10}
           onPress={summary?.kind === 'group' && conversationId
             ? () => router.push({ pathname: '/groups/[conversationId]', params: { conversationId } })
-            : undefined}
+            : peerUserId
+              ? () => router.push({ pathname: '/users/[userId]', params: { userId: peerUserId } })
+              : undefined}
           style={styles.roundButton}>
           <AppIcon name={{ ios: 'ellipsis', android: 'more_vert', web: 'more_vert' }} size={22} color={theme.colors.textSecondary} />
         </Pressable>
@@ -606,6 +705,21 @@ export default function ConversationScreen() {
         </View>
       ) : (
         <KeyboardAvoidingView style={styles.chatBody} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          {isDirectConversation && relationship?.messaging_available === false ? (
+            <View style={[styles.privacyBanner, { backgroundColor: theme.colors.surfaceMuted, borderBottomColor: theme.colors.border }]}>
+              <View style={styles.privacyBannerCopy}>
+                <AppText variant="captionStrong">{relationship.blocked_by_me ? 'You blocked this user' : 'Direct messaging unavailable'}</AppText>
+                <AppText variant="micro" tone="secondary">
+                  {relationship.blocked_by_me ? 'Unblock from the profile to resume direct messages.' : 'You can still read your existing conversation history.'}
+                </AppText>
+              </View>
+              {summary?.peer_user_id ? (
+                <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/users/[userId]', params: { userId: summary.peer_user_id! } })} hitSlop={8}>
+                  <AppText variant="captionStrong" tone="primary">Manage</AppText>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
           {isSearchWindow ? (
             <View style={[styles.searchResultBanner, { backgroundColor: theme.colors.primarySoft, borderBottomColor: theme.colors.border }]}>
               <View style={styles.searchResultCopy}>
@@ -619,14 +733,15 @@ export default function ConversationScreen() {
           ) : null}
           <View style={styles.messages}>{renderMessages()}</View>
 
-          {(loadError && messages.length > 0) || mediaError || actionError ? (
+          {(loadError && messages.length > 0) || mediaError || actionError || muteError ? (
             <Pressable
               onPress={() => {
                 setMediaError(null);
+                setMuteError(null);
                 clearActionError();
               }}
               style={[styles.inlineError, { backgroundColor: theme.colors.surfaceMuted }]}>
-              <AppText variant="micro" tone="danger">{actionError ?? mediaError ?? loadError}</AppText>
+              <AppText variant="micro" tone="danger">{actionError ?? mediaError ?? muteError ?? loadError}</AppText>
             </Pressable>
           ) : null}
 
@@ -679,7 +794,8 @@ export default function ConversationScreen() {
                   if (!editingMessage) updateTyping(value);
                 }}
                 maxLength={editingMessage?.message_type === 'image' ? 1000 : MAX_TEXT_MESSAGE_LENGTH}
-                placeholder={editingMessage ? 'Edit message' : 'Message'}
+                editable={Boolean(editingMessage || directMessagingAvailable)}
+                placeholder={editingMessage ? 'Edit message' : (directMessagingAvailable ? 'Message' : 'Messaging unavailable')}
                 placeholderTextColor={theme.colors.textTertiary}
                 style={[styles.input, theme.typography.body, { color: theme.colors.text }]}
                 accessibilityLabel={editingMessage ? 'Edit message' : 'Message'}
@@ -727,11 +843,21 @@ export default function ConversationScreen() {
           && (selectedMessage.message_type === 'text' || selectedMessage.message_type === 'image'),
         )}
         canDelete={Boolean(selectedMessage && selectedMessage.sender_id === user?.id)}
+        canReport={Boolean(selectedMessage?.sender_id && selectedMessage.sender_id !== user?.id && !selectedMessage.deleted_at)}
         onClose={() => setSelectedMessage(null)}
         onReply={startReply}
         onEdit={startEdit}
         onDelete={confirmDelete}
+        onReport={reportFromActions}
         onReaction={reactFromActions}
+      />
+
+      <ReportModal
+        visible={Boolean(reportTarget)}
+        targetLabel={reportTarget?.senderDisplayName ?? (isDirectConversation ? name : 'this user')}
+        messageReport
+        onClose={() => setReportTarget(null)}
+        onSubmit={submitMessageReport}
       />
     </SafeAreaView>
   );
@@ -769,6 +895,8 @@ const styles = StyleSheet.create({
   groupSenderName: { paddingLeft: 4, maxWidth: 220 },
   paginationLoader: { alignItems: 'center', justifyContent: 'center', paddingVertical: 16 },
   inlineError: { marginHorizontal: 10, marginBottom: 6, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },
+  privacyBanner: { minHeight: 58, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  privacyBannerCopy: { flex: 1, gap: 1 },
   searchResultBanner: { minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   searchResultCopy: { flex: 1, gap: 1 },
   composerContext: {

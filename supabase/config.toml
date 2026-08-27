@@ -4,3 +4,8 @@
 # exactly matches the PUSH_WEBHOOK_SECRET Edge Function secret.
 [functions.send-message-push]
 verify_jwt = false
+
+# Phase 18: the function performs its own bearer-token validation before any
+# destructive operation, matching the Phase 15 manual-auth pattern.
+[functions.delete-account]
+verify_jwt = false

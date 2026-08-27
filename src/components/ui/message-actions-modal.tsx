@@ -10,10 +10,12 @@ type MessageActionsModalProps = {
   visible: boolean;
   canEdit: boolean;
   canDelete: boolean;
+  canReport: boolean;
   onClose: () => void;
   onReply: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onReport: () => void;
   onReaction: (emoji: SupportedReaction) => void;
 };
 
@@ -21,10 +23,12 @@ export function MessageActionsModal({
   visible,
   canEdit,
   canDelete,
+  canReport,
   onClose,
   onReply,
   onEdit,
   onDelete,
+  onReport,
   onReaction,
 }: MessageActionsModalProps) {
   const theme = useAppTheme();
@@ -73,6 +77,7 @@ export function MessageActionsModal({
           {action('Reply', { ios: 'arrowshape.turn.up.left', android: 'reply', web: 'reply' }, onReply)}
           {canEdit ? action('Edit', { ios: 'pencil', android: 'edit', web: 'edit' }, onEdit) : null}
           {canDelete ? action('Delete for everyone', { ios: 'trash', android: 'delete', web: 'delete' }, onDelete, true) : null}
+          {canReport ? action('Report message', { ios: 'exclamationmark.bubble', android: 'report', web: 'report' }, onReport, true) : null}
         </Pressable>
       </Pressable>
     </Modal>

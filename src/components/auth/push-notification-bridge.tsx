@@ -1,6 +1,6 @@
 import type * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { useAuth } from '@/hooks/use-auth';
@@ -9,6 +9,7 @@ import { getMessageDetail } from '@/services/message-service';
 import { subscribeToInboxMessages } from '@/services/inbox-message-events';
 import { canShowBrowserNotifications, isBrowserTabHidden, showBrowserNotification } from '@/services/browser-notification-service';
 import { emitConversationActivity, subscribeToConversationActivity } from '@/services/conversation-events';
+import { DEFAULT_NOTIFICATION_PREFERENCES, getMyConversationNotificationState, getMyNotificationPreferences, subscribeToNotificationPreferences } from '@/services/settings-service';
 import {
   clearLastNotificationResponse,
   getActivePushConversation,
@@ -34,7 +35,16 @@ function getConversationIdFromNotification(notification: Notifications.Notificat
 export function PushNotificationBridge() {
   const { user } = useAuth();
   const handledResponseIds = useRef(new Set<string>());
+  const [notificationPreferences, setNotificationPreferences] = useState(DEFAULT_NOTIFICATION_PREFERENCES);
   const badgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    void getMyNotificationPreferences().catch((error) => {
+      console.warn('Unable to load notification preferences:', error);
+    });
+    return subscribeToNotificationPreferences(setNotificationPreferences);
+  }, [user?.id]);
 
   const scheduleBadgeSync = useCallback(() => {
     if (Platform.OS === 'web') return;
@@ -86,23 +96,32 @@ export function PushNotificationBridge() {
 
     return subscribeToInboxMessages((event) => {
       if (event.senderId === user.id) return;
+      if (!notificationPreferences.browser_notifications) return;
       if (!canShowBrowserNotifications() || !isBrowserTabHidden()) return;
       if (getActivePushConversation() === event.conversationId) return;
 
       void (async () => {
         try {
-          const [summary, message] = await Promise.all([
+          const [summary, message, muteState] = await Promise.all([
             getConversationSummary(event.conversationId),
             getMessageDetail(event.messageId),
+            getMyConversationNotificationState(event.conversationId),
           ]);
-          if (!summary || !message || message.deleted_at) return;
+          if (!summary || !message || message.deleted_at || muteState.is_muted) return;
+          if (summary.kind === 'direct' && !notificationPreferences.direct_messages) return;
+          if (summary.kind === 'group' && !notificationPreferences.group_messages) return;
 
+          let title = summary.display_name || 'PulseChat';
           let body = message.body?.trim() || 'New message';
           if (message.message_type === 'image') body = message.body?.trim() ? `📷 ${message.body.trim()}` : '📷 Photo';
           if (body.length > 180) body = `${body.slice(0, 177)}…`;
+          if (!notificationPreferences.show_message_preview) {
+            title = 'PulseChat';
+            body = summary.kind === 'group' ? 'New group message' : 'New message';
+          }
 
           showBrowserNotification({
-            title: summary.display_name || 'PulseChat',
+            title,
             body,
             conversationId: event.conversationId,
             onClick: () => {
@@ -117,7 +136,7 @@ export function PushNotificationBridge() {
         }
       })();
     });
-  }, [user?.id]);
+  }, [notificationPreferences, user?.id]);
 
   useEffect(() => {
     if (!user?.id || Platform.OS === 'web') return undefined;

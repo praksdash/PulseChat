@@ -119,3 +119,23 @@ No RPC accepts an acting-user ID; authorization always derives the actor from `a
 - `search_my_conversations(search_term, result_limit)` — authenticated chat search.
 - `search_my_messages(search_term, before_created_at, before_id, result_limit)` — authenticated message search with cursor pagination.
 - `get_message_window(focus_message_id, before_count, after_count)` — authorized context window for jump-to-message.
+
+
+## Phase 17 privacy/safety RPCs
+- `get_my_privacy_settings()` → current privacy switches.
+- `update_my_privacy_settings(discoverable, allow_new_direct, show_activity)` → updates only `auth.uid()`.
+- `get_user_relationship_state(user_id)` → safe coarse relationship state for UI gating without exposing private account metadata.
+- `block_user(user_id)` / `unblock_user(user_id)` → authenticated directional block management.
+- `list_my_blocked_users()` → safe profile projection for only the caller's block list.
+- `report_user_or_message(user_id, reason, details, message_id)` → private report submission; message reports verify caller membership and derive the actual sender.
+
+`search_profiles`, `get_public_profile`, `create_or_get_direct_conversation`, `get_user_last_seen`, Realtime authorization helpers and chat-media upload authorization are Phase-17-aware.
+
+## Phase 18 settings RPCs
+- `get_my_notification_preferences()` → caller's direct/group/preview/browser preferences.
+- `update_my_notification_preferences(direct_messages, group_messages, show_message_preview, browser_notifications)` → updates only `auth.uid()`.
+- `get_my_conversation_notification_state(conversation_id)` → caller's mute state for a conversation they belong to.
+- `set_my_conversation_muted(conversation_id, muted)` → mutes/unmutes only the caller's membership row.
+
+## Phase 18 Edge Function
+- `delete-account` — authenticated destructive account deletion. The request body must contain `{ "confirm": true }`. The function derives the account from the bearer token, cleans up the auth user/avatar and repairs owned-group ownership.

@@ -57,6 +57,120 @@ export type Database = {
         };
         Relationships: [];
       };
+      user_privacy_settings: {
+        Row: {
+          user_id: string;
+          discoverable_by_search: boolean;
+          allow_new_direct_messages: boolean;
+          show_activity_status: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          discoverable_by_search?: boolean;
+          allow_new_direct_messages?: boolean;
+          show_activity_status?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          discoverable_by_search?: boolean;
+          allow_new_direct_messages?: boolean;
+          show_activity_status?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      notification_preferences: {
+        Row: {
+          user_id: string;
+          direct_messages: boolean;
+          group_messages: boolean;
+          show_message_preview: boolean;
+          browser_notifications: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          direct_messages?: boolean;
+          group_messages?: boolean;
+          show_message_preview?: boolean;
+          browser_notifications?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          direct_messages?: boolean;
+          group_messages?: boolean;
+          show_message_preview?: boolean;
+          browser_notifications?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      blocked_users: {
+        Row: {
+          blocker_id: string;
+          blocked_user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          blocker_id: string;
+          blocked_user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          blocker_id?: string;
+          blocked_user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      reports: {
+        Row: {
+          id: string;
+          reporter_id: string;
+          reported_user_id: string;
+          conversation_id: string | null;
+          message_id: string | null;
+          reason: 'spam' | 'harassment' | 'impersonation' | 'sexual_content' | 'violence' | 'scam' | 'other';
+          details: string | null;
+          status: 'pending' | 'reviewing' | 'resolved' | 'dismissed';
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          reporter_id: string;
+          reported_user_id: string;
+          conversation_id?: string | null;
+          message_id?: string | null;
+          reason: 'spam' | 'harassment' | 'impersonation' | 'sexual_content' | 'violence' | 'scam' | 'other';
+          details?: string | null;
+          status?: 'pending' | 'reviewing' | 'resolved' | 'dismissed';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          reporter_id?: string;
+          reported_user_id?: string;
+          conversation_id?: string | null;
+          message_id?: string | null;
+          reason?: 'spam' | 'harassment' | 'impersonation' | 'sexual_content' | 'violence' | 'scam' | 'other';
+          details?: string | null;
+          status?: 'pending' | 'reviewing' | 'resolved' | 'dismissed';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       conversations: {
         Row: {
           id: string;
@@ -336,6 +450,43 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      get_my_notification_preferences: {
+        Args: Record<string, never>;
+        Returns: Array<{
+          direct_messages: boolean;
+          group_messages: boolean;
+          show_message_preview: boolean;
+          browser_notifications: boolean;
+        }>;
+      };
+      update_my_notification_preferences: {
+        Args: {
+          target_direct_messages: boolean;
+          target_group_messages: boolean;
+          target_show_message_preview: boolean;
+          target_browser_notifications: boolean;
+        };
+        Returns: Array<{
+          direct_messages: boolean;
+          group_messages: boolean;
+          show_message_preview: boolean;
+          browser_notifications: boolean;
+        }>;
+      };
+      get_my_conversation_notification_state: {
+        Args: { target_conversation_id: string };
+        Returns: Array<{
+          muted_until: string | null;
+          is_muted: boolean;
+        }>;
+      };
+      set_my_conversation_muted: {
+        Args: { target_conversation_id: string; target_muted: boolean };
+        Returns: Array<{
+          muted_until: string | null;
+          is_muted: boolean;
+        }>;
+      };
       register_my_push_token: {
         Args: {
           target_expo_push_token: string;
@@ -380,6 +531,63 @@ export type Database = {
           avatar_path: string | null;
           bio: string | null;
         }>;
+      };
+      get_my_privacy_settings: {
+        Args: Record<string, never>;
+        Returns: Array<{
+          discoverable_by_search: boolean;
+          allow_new_direct_messages: boolean;
+          show_activity_status: boolean;
+        }>;
+      };
+      update_my_privacy_settings: {
+        Args: {
+          target_discoverable_by_search: boolean;
+          target_allow_new_direct_messages: boolean;
+          target_show_activity_status: boolean;
+        };
+        Returns: Array<{
+          discoverable_by_search: boolean;
+          allow_new_direct_messages: boolean;
+          show_activity_status: boolean;
+        }>;
+      };
+      get_user_relationship_state: {
+        Args: { target_user_id: string };
+        Returns: Array<{
+          blocked_by_me: boolean;
+          has_direct_conversation: boolean;
+          can_start_direct: boolean;
+          messaging_available: boolean;
+          can_view_activity: boolean;
+        }>;
+      };
+      block_user: {
+        Args: { target_user_id: string };
+        Returns: undefined;
+      };
+      unblock_user: {
+        Args: { target_user_id: string };
+        Returns: undefined;
+      };
+      list_my_blocked_users: {
+        Args: Record<string, never>;
+        Returns: Array<{
+          user_id: string;
+          display_name: string;
+          username: string | null;
+          avatar_path: string | null;
+          blocked_at: string;
+        }>;
+      };
+      report_user_or_message: {
+        Args: {
+          target_user_id: string;
+          target_reason: 'spam' | 'harassment' | 'impersonation' | 'sexual_content' | 'violence' | 'scam' | 'other';
+          target_details?: string | null;
+          target_message_id?: string | null;
+        };
+        Returns: string;
       };
       create_or_get_direct_conversation: {
         Args: { target_user_id: string };

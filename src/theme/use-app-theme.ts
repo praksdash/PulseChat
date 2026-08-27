@@ -1,19 +1,13 @@
-import { useColorScheme } from 'react-native';
+import { useContext } from 'react';
 
-import { DarkColors, LightColors, Radius, Shadows, Spacing, Typography } from './tokens';
+import { ThemeContext } from './theme-provider';
 
 export function useAppTheme() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
-  return {
-    isDark,
-    colors: isDark ? DarkColors : LightColors,
-    spacing: Spacing,
-    radius: Radius,
-    typography: Typography,
-    shadows: Shadows,
-  } as const;
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useAppTheme must be used inside ThemeProvider.');
+  }
+  return context;
 }
 
 export type AppTheme = ReturnType<typeof useAppTheme>;

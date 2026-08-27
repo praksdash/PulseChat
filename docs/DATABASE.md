@@ -159,3 +159,35 @@ Indexes:
 - `conversations_title_search_trgm_idx` — partial GIN trigram index for group titles.
 
 Message search is cursor-paginated by `(created_at, id)` and only searches durable message body/caption text.
+
+
+## Phase 17 block/report/privacy
+
+### `public.user_privacy_settings`
+One row per user with `discoverable_by_search`, `allow_new_direct_messages`, and `show_activity_status`. Rows are created for existing profiles and automatically for future profiles. Client access goes through narrow authenticated RPCs.
+
+### `public.blocked_users`
+Composite primary key `(blocker_id, blocked_user_id)`. The row is directional, but direct-contact authorization treats a block in either direction as closing the pair. Historical direct messages remain stored/readable; new direct sends are denied.
+
+### `public.reports`
+Private moderation evidence with reporter, reported user, optional conversation/message, reason/details and moderation status. App clients cannot directly SELECT/INSERT this table; submissions go through `report_user_or_message()`.
+
+A before-insert message trigger protects all direct message creation paths, including SECURITY DEFINER media RPCs.
+
+## Phase 18 settings
+
+### `public.notification_preferences`
+One row per account with server-enforced message-notification choices:
+- `direct_messages`
+- `group_messages`
+- `show_message_preview`
+- `browser_notifications`
+
+The app does not receive direct table write access. `get_my_notification_preferences()` lazily ensures the caller's row exists and `update_my_notification_preferences(...)` updates only `auth.uid()`.
+
+### Per-chat mute
+`conversation_members.muted_until` remains the durable source of truth. Phase 18 exposes only caller-scoped RPCs:
+- `get_my_conversation_notification_state(conversation_id)`
+- `set_my_conversation_muted(conversation_id, muted)`
+
+Both resolve the membership row using `(conversation_id, auth.uid())`, so a group member cannot accidentally read or modify another member's mute state.

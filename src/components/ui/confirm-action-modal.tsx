@@ -31,14 +31,28 @@ export function ConfirmActionModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Close confirmation"
-        style={[styles.backdrop, { backgroundColor: theme.colors.overlay }]}
-        onPress={loading ? undefined : onCancel}>
+      <View style={[styles.backdrop, { backgroundColor: theme.colors.overlay }]}>
+        {/*
+          Keep the dismiss target as a sibling of the dialog card. React Native
+          Web renders Pressable with accessibilityRole="button" as a native
+          <button>. Wrapping the dialog would therefore create nested buttons
+          once AppButton renders inside the card, which is invalid HTML and
+          triggers React hydration/DOM warnings.
+        */}
         <Pressable
-          onPress={(event) => event.stopPropagation()}
-          style={[styles.card, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.border }]}>
+          accessibilityRole="button"
+          accessibilityLabel="Close confirmation"
+          disabled={loading}
+          style={styles.dismissLayer}
+          onPress={loading ? undefined : onCancel}
+        />
+
+        <View
+          accessibilityViewIsModal
+          style={[
+            styles.card,
+            { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.border },
+          ]}>
           <View style={styles.copy}>
             <AppText variant="heading">{title}</AppText>
             <AppText variant="body" tone="secondary">{message}</AppText>
@@ -62,8 +76,8 @@ export function ConfirmActionModal({
               />
             </View>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -74,6 +88,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
+  },
+  dismissLayer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
   },
   card: {
     width: '100%',

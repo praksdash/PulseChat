@@ -34,7 +34,12 @@ export default function AppLayout() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="chat/[conversationId]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="profile/edit" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="profile/settings" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="profile/appearance" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="profile/account" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="profile/notifications" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="profile/privacy" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="profile/blocked-users" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="users/[userId]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="groups/new" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="groups/[conversationId]" options={{ animation: 'slide_from_right' }} />

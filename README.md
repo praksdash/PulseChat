@@ -3,9 +3,9 @@
 Telegram-inspired messaging application built with React Native, Expo Router, TypeScript and Supabase.
 
 ## Current milestone
-Phase 15 — secure push notifications.
+Phase 18 — settings (implementation ready; verification pending).
 
-Implemented through Phase 14:
+Verified through Phase 17; Phase 18 implementation adds:
 - Android Expo development build
 - navigation + reusable messenger design system
 - Supabase email/password auth + persisted sessions
@@ -36,8 +36,13 @@ Implemented through Phase 14:
 ## Phase 15 setup
 Phase 15 requires Firebase FCM V1 credentials, `google-services.json`, the Supabase Edge Function and a Database Webhook. See `PHASE15_README.txt`, `docs/PROJECT_STATE.md` and the Phase 15 delivery instructions.
 
-Next: Phase 16 — search.
-
-
 ### Phase 16
 Global authenticated search is available for people, direct/group chats and message text/image captions, including secure jump-to-message context.
+
+### Phase 17
+Server-enforced blocks, private moderation reports, people-search visibility, new-direct-chat privacy, activity visibility and blocked-user management are implemented.
+
+### Phase 18
+Settings now include persistent System/Light/Dark appearance, account-wide notification preferences, per-chat mute, account/session controls and server-side account deletion.
+
+After Phase 18 verification: Phase 19 — offline/error handling.

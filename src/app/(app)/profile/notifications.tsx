@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton, AppIcon, AppText, SurfaceCard } from '@/components/ui';
+import { AppButton, AppIcon, AppText, SettingsToggleRow, SurfaceCard } from '@/components/ui';
 import {
   getBrowserNotificationPermission,
   requestBrowserNotificationPermission,
@@ -17,7 +17,13 @@ import {
   sendRemoteTestNotification,
   type NativeNotificationStatus,
 } from '@/services/push-notification-service';
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  getMyNotificationPreferences,
+  updateMyNotificationPreferences,
+} from '@/services/settings-service';
 import { useAppTheme } from '@/theme';
+import type { NotificationPreferences } from '@/types/settings';
 
 const EMPTY_NATIVE_STATUS: NativeNotificationStatus = {
   supported: false,
@@ -36,12 +42,20 @@ export default function NotificationSettingsScreen() {
   const theme = useAppTheme();
   const [nativeStatus, setNativeStatus] = useState<NativeNotificationStatus>(EMPTY_NATIVE_STATUS);
   const [browserPermission, setBrowserPermission] = useState<BrowserNotificationPermission>(() => getBrowserNotificationPermission());
+  const [preferences, setPreferences] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
   const [loading, setLoading] = useState(false);
+  const [savingPreference, setSavingPreference] = useState<keyof NotificationPreferences | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setBrowserPermission(getBrowserNotificationPermission());
+    try {
+      setPreferences(await getMyNotificationPreferences());
+    } catch (preferenceError) {
+      setError(preferenceError instanceof Error ? preferenceError.message : 'Unable to read notification preferences.');
+    }
+
     if (Platform.OS === 'web') return;
     try {
       setNativeStatus(await getNativeNotificationStatus());
@@ -69,6 +83,32 @@ export default function NotificationSettingsScreen() {
     }
   };
 
+  const savePreference = async (key: keyof NotificationPreferences, value: boolean) => {
+    if (savingPreference) return;
+    const previous = preferences;
+    const next = { ...preferences, [key]: value };
+    setPreferences(next);
+    setSavingPreference(key);
+    setMessage(null);
+    setError(null);
+
+    try {
+      if (key === 'browser_notifications' && value && Platform.OS === 'web') {
+        const permission = await requestBrowserNotificationPermission();
+        setBrowserPermission(permission);
+        if (permission !== 'granted') {
+          throw new Error('Browser notification permission was not granted.');
+        }
+      }
+      setPreferences(await updateMyNotificationPreferences(next));
+    } catch (preferenceError) {
+      setPreferences(previous);
+      setError(preferenceError instanceof Error ? preferenceError.message : 'Unable to save notification preference.');
+    } finally {
+      setSavingPreference(null);
+    }
+  };
+
   const enableNative = () => run(async () => {
     const result = await registerForPushNotifications();
     if (result.status === 'denied') throw new Error('Android notification permission is denied. Enable it in system settings.');
@@ -93,6 +133,9 @@ export default function NotificationSettingsScreen() {
     const permission = await requestBrowserNotificationPermission();
     setBrowserPermission(permission);
     if (permission !== 'granted') throw new Error('Browser notification permission was not granted.');
+    if (!preferences.browser_notifications) {
+      setPreferences(await updateMyNotificationPreferences({ ...preferences, browser_notifications: true }));
+    }
     setMessage('Browser alerts are enabled for PulseChat.');
   });
 
@@ -111,21 +154,63 @@ export default function NotificationSettingsScreen() {
   });
 
   const nativeReady = nativeStatus.permission === 'granted' && nativeStatus.registeredDevices > 0;
-  const browserReady = browserPermission === 'granted';
+  const browserReady = browserPermission === 'granted' && preferences.browser_notifications;
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <View style={styles.topBar}>
-        <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.backButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.canGoBack() ? router.back() : router.replace('/profile/settings')} style={styles.backButton}>
           <AppIcon name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={22} color={theme.colors.text} />
         </Pressable>
         <View style={styles.titleArea}>
           <AppText variant="heading">Notifications</AppText>
-          <AppText variant="caption" tone="secondary">Phone and web alerts</AppText>
+          <AppText variant="caption" tone="secondary">Message and device alerts</AppText>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.section}>
+          <AppText variant="captionStrong" tone="secondary" style={styles.sectionTitle}>MESSAGE NOTIFICATIONS</AppText>
+          <SurfaceCard style={styles.preferencesCard}>
+            <SettingsToggleRow
+              icon={{ ios: 'person.fill', android: 'person', web: 'person' }}
+              title="Direct messages"
+              subtitle="Notify me for one-to-one chats"
+              value={preferences.direct_messages}
+              disabled={Boolean(savingPreference)}
+              onValueChange={(value) => void savePreference('direct_messages', value)}
+            />
+            <SettingsToggleRow
+              icon={{ ios: 'person.3.fill', android: 'groups', web: 'groups' }}
+              title="Group messages"
+              subtitle="Notify me for group chats"
+              value={preferences.group_messages}
+              disabled={Boolean(savingPreference)}
+              onValueChange={(value) => void savePreference('group_messages', value)}
+            />
+            <SettingsToggleRow
+              icon={{ ios: 'text.bubble.fill', android: 'message', web: 'message' }}
+              title="Message previews"
+              subtitle="Show sender/message text in notifications"
+              value={preferences.show_message_preview}
+              disabled={Boolean(savingPreference)}
+              onValueChange={(value) => void savePreference('show_message_preview', value)}
+              last={Platform.OS !== 'web'}
+            />
+            {Platform.OS === 'web' ? (
+              <SettingsToggleRow
+                icon={{ ios: 'globe', android: 'language', web: 'language' }}
+                title="Browser notifications"
+                subtitle="Show desktop alerts while PulseChat is open"
+                value={preferences.browser_notifications}
+                disabled={Boolean(savingPreference)}
+                onValueChange={(value) => void savePreference('browser_notifications', value)}
+                last
+              />
+            ) : null}
+          </SurfaceCard>
+        </View>
+
         {Platform.OS !== 'web' ? (
           <>
             <SurfaceCard style={styles.card}>
@@ -148,13 +233,6 @@ export default function NotificationSettingsScreen() {
             <AppButton label={nativeReady ? 'Refresh push registration' : 'Enable notifications'} loading={loading} onPress={() => void enableNative()} />
             <AppButton label="Test notification on this phone" variant="secondary" disabled={loading} onPress={() => void testLocal()} />
             <AppButton label="Test remote push from server" variant="secondary" disabled={loading} onPress={() => void testRemote()} />
-
-            <SurfaceCard style={styles.helpCard}>
-              <AppText variant="captionStrong">How to verify Phase 15</AppText>
-              <AppText variant="caption" tone="secondary">
-                First run the local test. Then run the remote-server test. Finally put PulseChat in the background and send a message from another account.
-              </AppText>
-            </SurfaceCard>
           </>
         ) : (
           <>
@@ -162,7 +240,7 @@ export default function NotificationSettingsScreen() {
               <View style={styles.statusHeader}>
                 <View style={[styles.statusDot, { backgroundColor: browserReady ? theme.colors.success : theme.colors.warning }]} />
                 <View style={styles.flex}>
-                  <AppText variant="bodyStrong">Web browser notifications</AppText>
+                  <AppText variant="bodyStrong">Web browser permission</AppText>
                   <AppText variant="caption" tone="secondary">
                     {browserPermission === 'unsupported'
                       ? 'This browser does not expose the Notification API'
@@ -172,17 +250,15 @@ export default function NotificationSettingsScreen() {
               </View>
             </SurfaceCard>
 
-            <AppButton label={browserReady ? 'Browser notifications enabled' : 'Enable browser notifications'} loading={loading} disabled={browserReady && loading} onPress={() => void enableBrowser()} />
+            <AppButton label={browserReady ? 'Browser notifications enabled' : 'Enable browser notifications'} loading={loading} onPress={() => void enableBrowser()} />
             <AppButton label="Send browser test notification" variant="secondary" disabled={loading || browserPermission === 'unsupported'} onPress={() => void testBrowser()} />
-
-            <SurfaceCard style={styles.helpCard}>
-              <AppText variant="captionStrong">Web behavior</AppText>
-              <AppText variant="caption" tone="secondary">
-                PulseChat can show browser notifications for incoming realtime messages while the web app is open, including when its tab is in the background. Expo Notifications itself does not provide remote web push when the browser is fully closed.
-              </AppText>
-            </SurfaceCard>
           </>
         )}
+
+        <SurfaceCard style={styles.helpCard}>
+          <AppText variant="captionStrong">Per-chat mute</AppText>
+          <AppText variant="caption" tone="secondary">Open any conversation and use the bell control to mute or unmute only that chat.</AppText>
+        </SurfaceCard>
 
         {message ? (
           <SurfaceCard style={[styles.feedbackCard, { borderColor: theme.colors.success }]}>
@@ -205,11 +281,14 @@ const styles = StyleSheet.create({
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
   titleArea: { gap: 1 },
   content: { padding: 18, paddingBottom: 36, gap: 14 },
+  section: { gap: 8 },
+  sectionTitle: { paddingLeft: 4 },
+  preferencesCard: { overflow: 'hidden' },
   card: { padding: 18, gap: 14 },
   statusHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   statusDot: { width: 12, height: 12, borderRadius: 6 },
   flex: { flex: 1, gap: 2 },
   detailRows: { gap: 4, paddingLeft: 24 },
   helpCard: { padding: 16, gap: 6 },
-  feedbackCard: { padding: 14, gap: 4 },
+  feedbackCard: { padding: 14, gap: 4, borderWidth: StyleSheet.hairlineWidth },
 });

@@ -176,3 +176,10 @@ PulseChat validates current membership
 The sender never supplies recipient push tokens and the client never receives the server credential. Push is a server-side consequence of a durable message insert. The Database Webhook is protected by `PUSH_WEBHOOK_SECRET`; the Edge Function uses Supabase's server-only service-role environment and an Expo access token.
 
 Foreground delivery deliberately suppresses the OS banner when the user already has that exact conversation focused. Realtime remains responsible for the live in-app message UI; push is the background/terminated transport.
+
+## Phase 18 settings architecture
+- `ThemeProvider` owns device-local `system | light | dark` appearance and persists it with AsyncStorage.
+- PostgreSQL remains the source of truth for account-wide notification preferences and per-conversation mute state.
+- Native remote push preferences are enforced server-side by `send-message-push`.
+- Web alerts use the browser Notification API but consume the same account preferences and per-chat mute RPC.
+- Destructive account deletion is isolated in a Supabase Edge Function so service-role credentials never enter the Expo bundle.
