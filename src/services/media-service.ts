@@ -300,6 +300,7 @@ export async function sendImageMessage(input: {
   if (uploadError && !isDuplicateObjectError(uploadError)) {
     throw new Error(uploadError.message);
   }
+  const uploadedByThisAttempt = !uploadError;
 
   input.onStage?.('committing');
   const { data, error } = await supabase.rpc('create_image_message', {
@@ -314,7 +315,18 @@ export async function sendImageMessage(input: {
     target_reply_to_message_id: input.replyToMessageId ?? null,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    // A failed commit must not leave a newly uploaded, unattached object. Do
+    // not remove a duplicate object because it may belong to an earlier retry
+    // whose durable database response was lost.
+    if (uploadedByThisAttempt) {
+      const { error: cleanupError } = await supabase.storage
+        .from(CHAT_MEDIA_BUCKET)
+        .remove([storagePath]);
+      if (cleanupError) console.warn('Unable to clean up rejected chat media:', cleanupError.message);
+    }
+    throw new Error(error.message);
+  }
   const row = (data?.[0] ?? null) as CreateImageMessageRow | null;
   if (!row) throw new Error('The image message was not created.');
 

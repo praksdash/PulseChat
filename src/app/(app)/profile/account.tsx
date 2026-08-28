@@ -89,7 +89,7 @@ export default function AccountSettingsScreen() {
         <SurfaceCard style={[styles.dangerCard, { borderColor: theme.colors.danger }]}>
           <AppText variant="bodyStrong" tone="danger">Delete account</AppText>
           <AppText variant="caption" tone="secondary">
-            Permanently removes your PulseChat account, profile, memberships, blocks, notification registrations and settings. Existing messages remain in conversations with the sender shown as deleted where required.
+            Permanently removes your account, profile, memberships, blocks, notification registrations and settings. Messages and photos already shared in conversations remain as anonymized chat history.
           </AppText>
           <AppButton
             label="Delete my account"

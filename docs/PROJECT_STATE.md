@@ -1,7 +1,7 @@
 # PulseChat Project State
 
 ## Current phase
-Phase 20 — Prototype V1 performance optimization (implementation and automated checks complete; two-device acceptance pending)
+Phase 21 — Prototype V1 security hardening (implementation and automated checks complete; backend/device acceptance pending)
 
 ## Implemented
 - Phase 0 product scope/architecture
@@ -25,11 +25,12 @@ Phase 20 — Prototype V1 performance optimization (implementation and automated
 - Phase 18 settings/account controls
 - Phase 19 offline/error handling
 - Phase 20 Prototype V1 performance/correctness fixes
+- Phase 21 Prototype V1 security hardening
 
 ## Acceptance status
-- Local TypeScript, ESLint, keyed-coalescer unit tests (3/3), and Android Metro export passed on 2026-08-28 UTC.
-- Supabase migrations/RLS, Edge Function deployment, Firebase/FCM setup, and the final two-Android-device acceptance test remain owner-environment checks.
-- Do not mark Phase 20 accepted or begin Phase 21 until the V1 checklist in `PHASE20_README.txt` passes on real devices.
+- Local TypeScript, ESLint, unit tests (6/6), secret scan, high/critical dependency gate, Android export, and Web export passed on 2026-08-28 UTC.
+- Phase 21 migration/RLS verification, Edge Function deployment, Firebase/FCM setup, and the final two-Android-device acceptance test remain owner-environment checks.
+- Phase 20's physical acceptance gate was not claimed complete; Phase 21 proceeded only because the owner explicitly approved the next phase.
 
 ## Phase 15 implementation
 - `expo-notifications` SDK 57 integration
@@ -83,7 +84,7 @@ Phase 20 — Prototype V1 performance optimization (implementation and automated
 - iOS client code is included, but iOS credentials/device testing remain part of the later iOS production phase.
 
 ## Git checkpoint
-Recommended: `fix: harden phase 20 prototype v1 performance`
+Recommended: `feat: harden Phase 21 Prototype V1 security`
 
 - Phase 15 hotfix: Android notification channel no longer passes `sound: "default"` as a custom sound filename; system notification sound behavior is used instead.
 
@@ -185,5 +186,27 @@ None.
 ## Phase 20 verification
 Automated local verification completed with `npm run verify` and `npm run check:android`. Run `npx expo start -c`, then complete the Phase 20 V1 tests in `docs/TESTING.md` on two configured Android devices.
 
+## Phase 21 implementation
+- Private bounded rate-limit state and server-side limits for messages, reports, profile changes, and push diagnostics.
+- Idempotent message retries bypass fresh rate-limit consumption when the sender/client-message pair already exists.
+- Direct profile UPDATE is revoked; `update_my_profile()` derives the actor and validates profile input plus referenced avatar metadata.
+- New private chat-image paths must match the canonical conversation/uploader/client-message JPEG shape.
+- `create_image_message()` verifies the actual Storage object exists and its recorded MIME/size matches before committing metadata.
+- Rejected image commits remove objects uploaded by the current attempt; duplicate retry objects remain protected.
+- Native auth/cache/outbox persistence uses authenticated AES-256-GCM envelopes and upgrades readable Phase 19 AES-CTR values.
+- Web auth uses session storage; browser message caches/outboxes are memory-only and Phase 19 plaintext keys are removed when touched.
+- Offline message snapshots no longer persist signed media URLs.
+- Push webhook secrets use constant-time comparison, remote push tests are bounded, and Edge Function 500 responses do not expose internal errors.
+- Empty groups removed during account deletion also attempt group-avatar cleanup; shared messages/photos remain anonymized conversation history.
+- A committed-secret scan and high/critical npm advisory gate are part of verification.
+
+## Phase 21 migration
+`supabase/migrations/202608280017_phase21_security_hardening.sql`
+
+## Phase 21 verification
+Run `npm run verify:security`, `npm run check:android`, a Web export, then apply the migration and run `supabase/phase21_verify.sql`. Redeploy `send-message-push` and `delete-account` before manual testing.
+
 ## Next task
-Complete the two-device V1 acceptance test. Only after Phase 20 acceptance: Phase 21 — security review.
+Apply and verify Phase 21 in the owner Supabase project, redeploy both changed Edge Functions, then complete the combined Phase 20/21 two-device V1 acceptance test. Do not advance the roadmap until that gate passes.
+
+After the owner-environment deployment is ready, follow `docs/ROADMAP.md`: Phase 22 end-to-end QA, Phase 23 UI/accessibility polish, Phase 24 Android release engineering, Phase 25 Play Store internal beta readiness, and Phase 26 production hardening/observability.

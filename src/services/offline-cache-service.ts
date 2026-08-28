@@ -108,7 +108,13 @@ export async function cacheConversationMessages(
   messages: MessagePageRow[],
 ) {
   if (!userId || !conversationId) return;
-  await writeEnvelope(messageListKey(userId, conversationId), messages.slice(0, MAX_CACHED_MESSAGES));
+  // Signed URLs are bearer-style delivery artifacts. Persist only the durable
+  // attachment path; an authorized online client must mint a fresh URL.
+  const durableRows = messages.slice(0, MAX_CACHED_MESSAGES).map((message) => ({
+    ...message,
+    signed_media_url: null,
+  }));
+  await writeEnvelope(messageListKey(userId, conversationId), durableRows);
 }
 
 export async function loadCachedConversationMessages(userId: string, conversationId: string) {

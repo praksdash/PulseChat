@@ -2,6 +2,7 @@
 
 ## Profile/discovery RPCs
 - `is_username_available`
+- `update_my_profile` — caller-bound profile mutation with avatar-object validation; direct profile UPDATE is revoked.
 - `search_profiles`
 - `get_public_profile`
 
@@ -151,3 +152,10 @@ Client services:
 - `local-vault-service` — native encrypted persistence wrapper over AsyncStorage + SecureStore.
 
 All reconnect sends use the existing message insert API and existing server authorization.
+
+## Phase 21 security RPC changes
+
+- `create_image_message(...)` now requires a matching `storage.objects` row whose recorded MIME is `image/jpeg` and whose byte size equals the caller's prepared size.
+- `report_user_or_message(...)` now limits fresh submissions while keeping duplicate requests idempotent.
+- `claim_my_push_test()` is called by `send-message-push` before dispatching an authenticated diagnostic notification.
+- Fresh text/image message inserts share the private message-rate trigger; the client API and `client_message_id` contract are unchanged.

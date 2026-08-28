@@ -4,7 +4,7 @@ PulseChat is a Telegram-inspired messaging prototype built with React Native, Ex
 
 ## Current milestone
 
-Phase 20 — Prototype V1 performance optimization is implemented. Automated local verification passes; Firebase/Supabase configuration and the final two-device acceptance test remain environment-dependent.
+Phase 21 — Prototype V1 security hardening is implemented. Automated local verification passes; the new Supabase migration/Edge Function deployment and final two-device acceptance test remain environment-dependent.
 
 ## Prototype V1 success scope
 
@@ -42,23 +42,38 @@ Existing reply/edit/delete/reaction, privacy, settings, search, typing, and pres
 - working TypeScript, ESLint, focused unit-test, and Android export commands; and
 - conditional Firebase config for local checks before `google-services.json` is supplied.
 
+## Phase 21 hardening
+
+- server-side fixed-window limits for message creation, report submissions, profile writes, and remote push diagnostics;
+- RPC-only profile updates with caller ownership and avatar-object metadata checks;
+- canonical private image paths plus authoritative Storage object MIME/size validation before message commit;
+- AES-256-GCM authentication for native session/cache/outbox envelopes with Phase 19 migration support;
+- memory-only browser message cache/outbox plus session-only browser auth persistence;
+- signed media URLs removed from persistent offline snapshots;
+- cleanup of newly uploaded objects when image-message commit is rejected;
+- generic Edge Function failure responses and constant-time webhook-secret comparison;
+- secret scanning and a high/critical dependency audit gate; and
+- explicit account/message/media deletion semantics.
+
 ## Local setup
 
 1. Install Node.js and npm supported by Expo SDK 57.
 2. Run `npm ci`.
 3. Copy `.env.example` to `.env` and add the Supabase URL and publishable key.
-4. Apply the Supabase migrations in order.
+4. Apply the Supabase migrations in order, including Phase 21.
 5. For real Android push notifications, add your Firebase `google-services.json` at the project root and complete `PHASE15_SETUP.md`.
-6. Run `npm run verify`.
-7. Start with `npx expo start -c`.
+6. Run `supabase/phase21_verify.sql`, and redeploy `send-message-push` plus `delete-account`.
+7. Run `npm run verify:security`.
+8. Start with `npx expo start -c`.
 
 ## Verification commands
 
 ```bash
 npm run verify
+npm run verify:security
 npm run check:android
 ```
 
 `check:android` validates the JavaScript Android bundle. A real development/preview build plus two physical devices is still required to verify FCM delivery, background notifications, camera/gallery permissions, realtime receipts, and restart persistence.
 
-See `PHASE20_README.txt`, `docs/PROJECT_STATE.md`, `docs/PERFORMANCE.md`, `docs/TESTING.md`, and `docs/PHASE20_FIX_REPORT.md` for the exact handoff state.
+See `PHASE21_README.txt`, `docs/PROJECT_STATE.md`, `docs/ROADMAP.md`, `docs/SECURITY.md`, `docs/PHASE21_SECURITY_REVIEW.md`, and `docs/TESTING.md` for the exact handoff state.

@@ -89,6 +89,17 @@ Deno.serve(async (req) => {
     if (profileError) throw new Error(`Unable to inspect profile: ${profileError.message}`);
 
     const ownedConversationIds = [...new Set((ownedRows ?? []).map((row) => row.conversation_id).filter(Boolean))];
+    const { data: ownedGroups, error: ownedGroupsError } = ownedConversationIds.length > 0
+      ? await admin
+        .from('conversations')
+        .select('id, avatar_path')
+        .in('id', ownedConversationIds)
+        .eq('kind', 'group')
+      : { data: [], error: null };
+    if (ownedGroupsError) throw new Error(`Unable to inspect owned groups: ${ownedGroupsError.message}`);
+    const groupAvatarById = new Map(
+      (ownedGroups ?? []).map((group) => [group.id, group.avatar_path as string | null]),
+    );
 
     const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
     if (deleteError) throw new Error(`Unable to delete auth account: ${deleteError.message}`);
@@ -112,7 +123,19 @@ Deno.serve(async (req) => {
           .delete()
           .eq('id', conversationId)
           .eq('kind', 'group');
-        if (deleteGroupError) console.error('Unable to remove empty group:', conversationId, deleteGroupError.message);
+        if (deleteGroupError) {
+          console.error('Unable to remove empty group:', conversationId, deleteGroupError.message);
+        } else {
+          const groupAvatarPath = groupAvatarById.get(conversationId);
+          if (groupAvatarPath) {
+            const { error: groupAvatarError } = await admin.storage
+              .from('group-avatars')
+              .remove([groupAvatarPath]);
+            if (groupAvatarError) {
+              console.warn('Empty group removed but avatar cleanup failed:', groupAvatarError.message);
+            }
+          }
+        }
         continue;
       }
 
@@ -142,6 +165,6 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: true });
   } catch (error) {
     console.error('delete-account failed:', error);
-    return jsonResponse({ ok: false, error: error instanceof Error ? error.message : 'Account deletion failed.' }, 500);
+    return jsonResponse({ ok: false, error: 'Account deletion failed.' }, 500);
   }
 });

@@ -40,11 +40,11 @@ Conversation activity broadcasts are coalesced over a short window before Chats/
 - Concurrent requests for the same path share one in-flight promise.
 - The cache is bounded to 300 paths and refreshed as an LRU-style map.
 - Cache generation and all entries are cleared when the authenticated account changes, so a signed URL cannot be reused by a later account in the same app process.
-- Signed URLs are not intentionally persisted by Phase 20. Existing offline message snapshots may contain the most recently rendered URL, but server authorization is still required to mint a fresh one.
+- Phase 21 strips signed URLs before offline message snapshots are written. Cached rows retain only the durable private object path and must be re-authorized online for a fresh URL.
 
 ## Offline cache writes
 
-- Recent chat lists, summaries, and message pages keep the Phase 19 native encrypted-envelope format.
+- Recent chat lists, summaries, and message pages use the Phase 21 authenticated AES-256-GCM envelope; readable Phase 19 values are upgraded on first access.
 - Each key has a serialized write queue, preventing an older slow write from finishing after a newer snapshot.
 - A byte-identical serialized payload is not encrypted/written twice in the same process.
 - Fingerprints and pending writes are bounded/cleared with the user cache.

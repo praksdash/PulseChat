@@ -195,3 +195,19 @@ Both resolve the membership row using `(conversation_id, auth.uid())`, so a grou
 ## Phase 19 database impact
 
 No schema migration. PostgreSQL remains authoritative. Phase 19 relies on the existing unique sender/client-message constraint for idempotent retry and uses local device persistence only as a temporary cache/outbox.
+
+## Phase 21 security hardening
+
+`pulsechat_private.rate_limit_state` retains one fixed-window counter per authenticated actor/action. Only trusted trigger/RPC code can call `pulsechat_private.enforce_rate_limit()`.
+
+New/changed database boundaries:
+
+- `public.messages` has a fresh-message limiter trigger while preserving existing sender/client idempotency.
+- `public.report_user_or_message()` retains Phase 17 membership/sender checks and limits only new report rows.
+- `public.update_my_profile()` replaces direct profile UPDATE and validates avatar Storage metadata.
+- `pulsechat_private.can_upload_chat_media_object()` enforces the canonical JPEG object path for new uploads.
+- `public.create_image_message()` verifies the actual private object MIME/size before creating attachment metadata.
+- `public.claim_my_push_test()` limits authenticated remote notification diagnostics.
+
+Migration: `supabase/migrations/202608280017_phase21_security_hardening.sql`  
+Verification: `supabase/phase21_verify.sql`

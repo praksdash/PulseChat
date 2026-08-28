@@ -23,6 +23,22 @@ export async function isUsernameAvailable(username: string) {
   return Boolean(data);
 }
 
+export async function updateMyProfile(input: {
+  displayName: string;
+  username: string | null;
+  bio: string | null;
+  avatarPath: string | null;
+}) {
+  const { error } = await supabase.rpc('update_my_profile', {
+    target_display_name: input.displayName.trim(),
+    target_username: input.username?.trim() || null,
+    target_bio: input.bio?.trim() || null,
+    target_avatar_path: input.avatarPath,
+  });
+
+  if (error) throw new Error(error.message);
+}
+
 export async function uploadAvatar(userId: string, localUri: string) {
   const context = ImageManipulator.ImageManipulator.manipulate(localUri);
   context.resize({ width: AVATAR_SIZE, height: AVATAR_SIZE });

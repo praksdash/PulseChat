@@ -223,3 +223,39 @@ Typing/presence was added in Phase 11 and image media in Phase 12; their regress
 10. Regression: notifications, mute, search, groups, block/report/privacy, account deletion, and realtime receipts remain functional.
 
 Do not mark Phase 20 accepted until the Prototype V1 two-device gate passes. Automated export alone does not verify FCM, OS permissions, background delivery, Supabase RLS, or physical-device persistence.
+
+## Phase 21 security tests
+
+### Automated and deployment gate
+
+1. Run `npm ci`.
+2. Run `npm run verify:security`; typecheck, lint, six unit tests, committed-secret scan, and the high/critical dependency gate must pass.
+3. Run `npm run check:android` and `npx expo export --platform web --output-dir dist-phase21-web-check`.
+4. Apply `supabase/migrations/202608280017_phase21_security_hardening.sql` after Phase 18.
+5. Run `supabase/phase21_verify.sql` in the same project; it must return `Phase 21 security verification passed.`
+6. Redeploy `send-message-push` and `delete-account` with their existing `--no-verify-jwt` configuration. Keep all existing server secrets configured.
+
+### Authorization and abuse checks
+
+1. Confirm an authenticated direct `UPDATE public.profiles` fails, while saving Profile → Edit through `update_my_profile()` succeeds.
+2. With a modified request, reference a missing avatar object or another user's avatar path; the profile RPC must reject it.
+3. Send normal direct/group text and image messages. Then generate more than 60 fresh message IDs inside one minute for a disposable account; excess inserts must return `Too many requests` without weakening RLS/block checks.
+4. Retry an already committed `client_message_id`; it must still reconcile to the existing durable message rather than create a duplicate.
+5. Upload a chat object, then call `create_image_message()` with a different size, MIME, path, conversation, or user folder; every mismatch must fail.
+6. Force a fresh image commit failure in the official client and confirm its newly uploaded object is removed. A duplicate-path retry must not remove the prior valid object.
+7. Submit a report twice for the same target; the existing report id remains idempotent. More than 10 distinct fresh reports in an hour must be limited.
+8. Trigger five authenticated remote push diagnostics, then confirm the next request is limited while normal message pushes remain unaffected.
+9. Repeat Phase 17 block tests: a modified client cannot send direct text/image, typing/presence remains hidden, reports remain unreadable, and shared group messages still work.
+
+### Local-data and deletion checks
+
+1. On native, warm cache/session/outbox data, restart, and confirm restore. Modify one encrypted AsyncStorage envelope and confirm it is rejected rather than rendered.
+2. Upgrade a Phase 20 native install and confirm a readable legacy session/cache still restores, then is rewritten in the Phase 21 envelope on use.
+3. On Web, sign in and warm a conversation, then close the browser session. Confirm the auth session and message cache/outbox do not persist into a new browser session.
+4. Inspect a cached message snapshot and confirm `signed_media_url` is null while the durable attachment path remains.
+5. Delete an image message. Its body/attachment metadata must be redacted immediately and another member must be unable to mint a new signed URL, even if best-effort physical cleanup is delayed.
+6. Delete a disposable account. Confirm auth/profile/membership/settings/token data is gone, group ownership is repaired, an empty owned group and its avatar are removed best-effort, and retained messages/photos show as anonymized history.
+
+### Combined Prototype V1 gate
+
+Repeat the Phase 20 two-device gate after Phase 21 deployment. Do not mark Phase 21 accepted until both the SQL verification and the real-device V1 flow pass.

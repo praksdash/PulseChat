@@ -27,8 +27,9 @@ The user inbox event contains only conversation/message/sender IDs and creation 
 ## Source-of-truth safety
 Realtime is not durable application state. Messages and receipts are recovered from PostgreSQL after restart/reconnect.
 
-## Future hardening
-Phase 21 will add rate limiting/abuse review, block/report enforcement, deletion semantics, media validation, dependency review and monitoring.
+## Phase 21 security boundary
+
+Phase 21 hardens the existing Prototype V1 features without claiming secret-chat E2EE, malware scanning, production SIEM, or Telegram-scale anti-abuse infrastructure. PostgreSQL/RLS remains the authorization boundary; client validation remains UX only.
 
 ## Phase 11 Realtime authorization
 
@@ -117,4 +118,35 @@ Phase 21 will add rate limiting/abuse review, block/report enforcement, deletion
 - `client_message_id` remains the retry idempotency boundary. Retrying a request after an uncertain network response cannot intentionally create a second message row.
 - Authorization/validation failures are not treated as connectivity failures and do not enter an automatic retry loop.
 - Permanent account deletion clears the deleted user's cached data and durable outbox on the device.
-- Browser offline storage is protected by browser origin isolation rather than Expo SecureStore; this will be reviewed again during Phase 21 security review.
+- Native session/cache/outbox values now use authenticated AES-256-GCM envelopes. Readable Phase 19 AES-CTR values are upgraded on first use; authentication failures are discarded.
+- Browser message cache/outbox state is memory-only and legacy Phase 19 persisted keys are removed when touched. Browser auth uses `sessionStorage`, so it does not persist after the browser session ends.
+- Offline message snapshots persist durable attachment paths but never signed media URLs.
+
+## Phase 21 rate limits and abuse controls
+
+- Message creation is limited to 60 fresh messages/minute and 1,000/hour per sender. An existing `(sender_id, client_message_id)` retry is idempotent and does not consume fresh capacity.
+- Fresh reports are limited to 10/hour and 50/day per reporter; duplicate reports still return the existing report id.
+- Profile mutations are limited to 30/hour and remote push tests to 5/hour.
+- Rate counters live in the private schema with one bounded row per user/action. App roles cannot read or mutate them.
+- Supabase Auth login/signup rate limits, CAPTCHA, project Storage quotas, and email-provider protections remain deployment settings and must be configured in the owner project.
+
+## Phase 21 media validation
+
+- New chat-media objects must use the exact `<conversation>/<uploader>/<client-message>.jpg` shape and remain in the private JPEG-only, 10 MB bucket.
+- The image commit RPC checks the actual Storage object row, recorded MIME, and byte size; caller metadata alone is not trusted.
+- Profile writes use `update_my_profile()` and validate referenced avatar ownership, object existence, recorded MIME, and size. Direct profile table updates are revoked.
+- The official client decodes and re-encodes selected images as JPEG before upload. Rejected fresh uploads are removed best-effort.
+- Raw-byte malware/content scanning is outside Prototype V1 and must be added before accepting arbitrary files or untrusted rich media.
+
+## Phase 21 deletion semantics
+
+- Delete-for-everyone immediately redacts the durable message body, removes reactions/attachment metadata, and prevents new signed URLs. Physical object deletion remains best-effort; an orphan is not readable through app Storage RLS.
+- Account deletion removes auth/profile/membership/settings/token data, anonymizes retained sender references through existing foreign keys, repairs group ownership, removes empty groups, and attempts avatar cleanup.
+- Messages and photos already shared remain as anonymized conversation history, matching the confirmation UI. This retention rule is explicit; Prototype V1 does not claim a legal/compliance retention workflow.
+
+## Phase 21 dependency and secret review
+
+- `npm run secrets:check` scans shipped text sources for common private-key/token signatures.
+- `npm run audit:security` fails on high/critical production dependency advisories.
+- On 2026-08-28, the audit reported 0 high, 0 critical, and 11 moderate transitive findings through Expo CLI/config/xcode paths. The suggested force fix changes SDK-controlled Expo packages outside this SDK 57 dependency set and is rejected as a breaking/incompatible remediation. Recheck when an SDK 57-compatible upstream release is available.
+- Runtime secrets remain server-side. `google-services.json`, service-account files, local `.env` files, and signing keys are excluded from the package.

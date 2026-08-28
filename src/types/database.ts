@@ -512,6 +512,15 @@ export type Database = {
         Args: { candidate: string };
         Returns: boolean;
       };
+      update_my_profile: {
+        Args: {
+          target_display_name: string;
+          target_username?: string | null;
+          target_bio?: string | null;
+          target_avatar_path?: string | null;
+        };
+        Returns: undefined;
+      };
       search_profiles: {
         Args: { search_term: string; result_limit?: number };
         Returns: Array<{

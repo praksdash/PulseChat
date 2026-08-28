@@ -85,7 +85,6 @@ Receipt updates are broadcast as a monotonic `through_created_at` cursor instead
 - calls, secret-chat E2EE, stories, bots, channels, desktop and multi-device clients
 - expanded audio/video/voice/file messaging
 - chat-list cursor pagination beyond the V1 50-conversation cap
-- Phase 21 security review after V1 device acceptance
 - Phase 26: asynchronous Expo push-receipt polling/monitoring
 
 ## Phase 12 image send flow
@@ -204,7 +203,7 @@ ConnectivityProvider (backend reachability)
             authoritative reconciliation
 ```
 
-Recent conversation lists, summaries and message pages are cached locally after successful reads. Native cache/outbox payloads are AES-encrypted before AsyncStorage persistence, with the encryption key kept in Expo SecureStore. Web follows browser-origin storage semantics.
+Recent conversation lists, summaries and message pages are cached locally after successful reads. Native cache/outbox payloads use authenticated AES-256-GCM before AsyncStorage persistence, with the key kept in Expo SecureStore. Web keeps message cache/outbox data in memory and auth only for the browser session.
 
 Text outbox entries are durable across app restarts. Image picker/camera URIs are intentionally session-only because temporary mobile URIs are not reliable across process restarts. Realtime remains an acceleration layer; PostgreSQL remains the source of truth after reconnection.
 
@@ -227,3 +226,22 @@ Message/chat FlatLists use bounded render windows, batched cell mounting, stable
 Private media signing uses batch requests, per-path in-flight deduplication, and a bounded in-memory cache whose TTL is shorter than the one-hour signed URL lifetime. Authentication changes invalidate the cache. Phase 19 encrypted offline writes are serialized per key and skip identical payloads so reconnect/focus reconciliation neither writes stale snapshots out of order nor repeats encryption/storage work.
 
 No Phase 20 optimization bypasses RLS, durable message persistence, receipts, privacy rules or retry idempotency.
+
+## Phase 21 security architecture
+
+Phase 21 keeps security decisions on trusted boundaries:
+
+```text
+client write
+   ↓
+RLS / caller-bound RPC
+   ├─ membership, role, block and ownership checks
+   ├─ bounded private rate counter
+   └─ Storage object metadata check for media/profile paths
+            ↓
+      durable PostgreSQL state
+```
+
+Native local state uses AES-256-GCM with the storage key as associated data, so ciphertext copied between cache/session keys or modified at rest is rejected. Legacy native AES-CTR values are read only for one-time migration. Browser message data is not persisted.
+
+Signed media URLs stay in process memory and are stripped from offline snapshots. PostgreSQL stores only durable private object paths. The official image client re-encodes JPEGs, Storage constrains recorded MIME/size, and the commit RPC verifies the actual object row before accepting attachment metadata.

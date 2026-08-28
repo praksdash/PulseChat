@@ -14,11 +14,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, AppIcon, AppText, AppTextField, Avatar, SurfaceCard } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
-import { supabase } from '@/lib/supabase';
 import {
   deleteAvatar,
   getAvatarPublicUrl,
   isUsernameAvailable,
+  updateMyProfile,
   uploadAvatar,
 } from '@/services/profile-service';
 import { useAppTheme } from '@/theme';
@@ -160,27 +160,12 @@ export default function EditProfileScreen() {
         nextAvatarPath = uploadedPath;
       }
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          display_name: displayName.trim(),
-          username: normalizedUsername || null,
-          bio: bio.trim() || null,
-          avatar_path: nextAvatarPath,
-        })
-        .eq('id', user.id);
-
-      if (error) {
-        if (uploadedPath) await deleteAvatar(uploadedPath);
-
-        if (error.code === '23505') {
-          setUsernameState('taken');
-          setFormError('That username is already taken.');
-        } else {
-          setFormError(error.message || 'Unable to save your profile.');
-        }
-        return;
-      }
+      await updateMyProfile({
+        displayName,
+        username: normalizedUsername || null,
+        bio: bio || null,
+        avatarPath: nextAvatarPath,
+      });
 
       if (profile.avatar_path && profile.avatar_path !== nextAvatarPath) {
         await deleteAvatar(profile.avatar_path);
@@ -190,7 +175,13 @@ export default function EditProfileScreen() {
       router.back();
     } catch (error) {
       if (uploadedPath) await deleteAvatar(uploadedPath);
-      setFormError(error instanceof Error ? error.message : 'Unable to save your profile.');
+      const message = error instanceof Error ? error.message : 'Unable to save your profile.';
+      if (message.toLowerCase().includes('duplicate key')) {
+        setUsernameState('taken');
+        setFormError('That username is already taken.');
+      } else {
+        setFormError(message);
+      }
     } finally {
       setIsSaving(false);
     }

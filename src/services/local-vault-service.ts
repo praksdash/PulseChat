@@ -1,10 +1,18 @@
+import 'react-native-get-random-values';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as aesjs from 'aes-js';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+import {
+  decryptAuthenticatedString,
+  encryptAuthenticatedString,
+} from '@/utils/secure-envelope';
+
 const MASTER_KEY_NAME = 'pulsechat_offline_vault_key_v1';
-const ENVELOPE_VERSION = 1;
+const LEGACY_ENVELOPE_VERSION = 1;
+const browserMemoryVault = new Map<string, string>();
 
 type EncryptedEnvelope = {
   v: number;
@@ -29,62 +37,78 @@ async function getMasterKey() {
   return masterKeyPromise;
 }
 
-function createCounterValue() {
-  const bytes = crypto.getRandomValues(new Uint8Array(6));
-  return bytes.reduce((value, byte) => value * 256 + byte, 0);
-}
-
 export async function localVaultSet(key: string, value: string) {
   if (Platform.OS === 'web') {
-    await AsyncStorage.setItem(key, value);
+    // Browser storage is readable by any script executing in the origin. Keep
+    // message snapshots/outbox entries memory-only and erase Phase 19 plaintext
+    // values as each key is touched.
+    browserMemoryVault.set(key, value);
+    await AsyncStorage.removeItem(key);
     return;
   }
 
   const masterKey = await getMasterKey();
-  const counter = createCounterValue();
-  const cipher = new aesjs.ModeOfOperation.ctr(masterKey, new aesjs.Counter(counter));
-  const encrypted = cipher.encrypt(aesjs.utils.utf8.toBytes(value));
-  const envelope: EncryptedEnvelope = {
-    v: ENVELOPE_VERSION,
-    counter,
-    cipher: aesjs.utils.hex.fromBytes(encrypted),
-  };
-  await AsyncStorage.setItem(key, JSON.stringify(envelope));
+  await AsyncStorage.setItem(key, encryptAuthenticatedString(masterKey, value, key));
 }
 
 export async function localVaultGet(key: string) {
+  if (Platform.OS === 'web') {
+    await AsyncStorage.removeItem(key);
+    return browserMemoryVault.get(key) ?? null;
+  }
+
   const stored = await AsyncStorage.getItem(key);
-  if (!stored || Platform.OS === 'web') return stored;
+  if (!stored) return stored;
 
   try {
-    const envelope = JSON.parse(stored) as EncryptedEnvelope;
-    if (
-      envelope?.v !== ENVELOPE_VERSION
-      || typeof envelope.counter !== 'number'
-      || typeof envelope.cipher !== 'string'
-    ) {
-      return null;
+    const parsed = JSON.parse(stored) as EncryptedEnvelope;
+    const masterKey = await getMasterKey();
+
+    if (parsed?.v === 2) {
+      return decryptAuthenticatedString(masterKey, stored, key);
     }
 
-    const masterKey = await getMasterKey();
-    const cipher = new aesjs.ModeOfOperation.ctr(masterKey, new aesjs.Counter(envelope.counter));
-    const decrypted = cipher.decrypt(aesjs.utils.hex.toBytes(envelope.cipher));
-    return aesjs.utils.utf8.fromBytes(decrypted);
+    // One-time compatibility for native Phase 19 AES-CTR values. A successful
+    // read is immediately rewritten as an authenticated AES-256-GCM envelope.
+    if (
+      parsed?.v === LEGACY_ENVELOPE_VERSION
+      && typeof parsed.counter === 'number'
+      && typeof parsed.cipher === 'string'
+    ) {
+      const legacyCipher = new aesjs.ModeOfOperation.ctr(masterKey, new aesjs.Counter(parsed.counter));
+      const decrypted = aesjs.utils.utf8.fromBytes(
+        legacyCipher.decrypt(aesjs.utils.hex.toBytes(parsed.cipher)),
+      );
+      await localVaultSet(key, decrypted);
+      return decrypted;
+    }
+
+    return null;
   } catch (error) {
-    console.warn('Unable to decrypt PulseChat local data:', error);
+    console.warn('Unable to authenticate or decrypt PulseChat local data:', error);
     return null;
   }
 }
 
 export async function localVaultRemove(key: string) {
+  browserMemoryVault.delete(key);
   await AsyncStorage.removeItem(key);
 }
 
 export async function localVaultGetAllKeys() {
+  if (Platform.OS === 'web') {
+    const persistedKeys = await AsyncStorage.getAllKeys();
+    const legacyKeys = persistedKeys.filter((key) => (
+      key.startsWith('pulsechat.cache.v1:') || key.startsWith('pulsechat.outbox.v1:')
+    ));
+    if (legacyKeys.length > 0) await AsyncStorage.removeMany(legacyKeys);
+    return [...browserMemoryVault.keys()];
+  }
   return AsyncStorage.getAllKeys();
 }
 
 export async function localVaultMultiRemove(keys: readonly string[]) {
   if (keys.length === 0) return;
+  keys.forEach((key) => browserMemoryVault.delete(key));
   await AsyncStorage.removeMany([...keys]);
 }

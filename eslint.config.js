@@ -3,9 +3,9 @@ const { defineConfig } = require('eslint/config');
 const expoConfig = require('eslint-config-expo/flat');
 
 module.exports = defineConfig([
+  { ignores: ['dist*/**', '.expo/**'] },
   expoConfig,
   {
-    ignores: ['dist*/**'],
     rules: {
       // PulseChat intentionally starts async screen loads and controlled form
       // resets from effects. The Expo rule flags the call site even though the

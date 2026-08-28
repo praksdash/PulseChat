@@ -66,6 +66,18 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function secretsMatch(expected: string, supplied: string) {
+  const encoder = new TextEncoder();
+  const expectedBytes = encoder.encode(expected);
+  const suppliedBytes = encoder.encode(supplied);
+  let difference = expectedBytes.length ^ suppliedBytes.length;
+  const maxLength = Math.max(expectedBytes.length, suppliedBytes.length);
+  for (let index = 0; index < maxLength; index += 1) {
+    difference |= (expectedBytes[index] ?? 0) ^ (suppliedBytes[index] ?? 0);
+  }
+  return difference === 0;
+}
+
 function getAdminKey() {
   const legacy = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (legacy) return legacy;
@@ -207,6 +219,15 @@ async function dispatchTestForAuthenticatedUser(req: Request) {
   const user = userData.user;
   if (userError || !user) {
     return jsonResponse({ ok: false, error: 'Authentication required for a test notification.' }, 401);
+  }
+
+  const { error: rateLimitError } = await authClient.rpc('claim_my_push_test');
+  if (rateLimitError) {
+    const limited = rateLimitError.message.toLowerCase().includes('too many requests');
+    return jsonResponse({
+      ok: false,
+      error: limited ? 'Too many test notifications. Try again later.' : 'Unable to authorize the test notification.',
+    }, limited ? 429 : 403);
   }
 
   const admin = await getAdminClient();
@@ -516,7 +537,7 @@ Deno.serve(async (req: Request) => {
 
     const expectedSecret = Deno.env.get('PUSH_WEBHOOK_SECRET');
     const suppliedSecret = req.headers.get('x-pulsechat-webhook-secret');
-    if (!expectedSecret || !suppliedSecret || suppliedSecret !== expectedSecret) {
+    if (!expectedSecret || !suppliedSecret || !secretsMatch(expectedSecret, suppliedSecret)) {
       return jsonResponse({ error: 'Unauthorized webhook.' }, 401);
     }
 
@@ -533,9 +554,6 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ ok: true, ...result });
   } catch (error) {
     console.error('PulseChat push dispatch failed:', error);
-    return jsonResponse({
-      ok: false,
-      error: error instanceof Error ? error.message : 'Push dispatch failed.',
-    }, 500);
+    return jsonResponse({ ok: false, error: 'Push dispatch failed.' }, 500);
   }
 });

@@ -45,4 +45,8 @@ Suggested acceptance test
 7. Restore network. The banner disappears and both text messages send automatically once, with no duplicates.
 8. Disable network, choose a photo, and confirm it shows queued. Restore network without killing the app and confirm it uploads automatically.
 9. While offline, try edit/delete/react/search-old-message and confirm a clear connection-required message is shown.
-10. Repeat on web using browser offline mode; cached list/text outbox use browser-origin storage.
+10. Historical Phase 19 web check: cached list/text outbox used browser-origin storage.
+
+Phase 21 security override
+--------------------------
+Native Phase 19 AES-CTR values now migrate to authenticated AES-256-GCM on a successful read. Web auth is session-only, and web message cache/outbox data is memory-only; the historical persistent-web-cache behavior above is intentionally removed.
