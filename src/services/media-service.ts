@@ -14,6 +14,8 @@ export const CHAT_MEDIA_SIGNED_URL_SECONDS = 60 * 60;
 
 type SignedUrlCacheEntry = { url: string; expiresAt: number };
 const signedUrlMemoryCache = new Map<string, SignedUrlCacheEntry>();
+const signedUrlInFlight = new Map<string, Promise<string | null>>();
+let signedUrlCacheGeneration = 0;
 
 function getCachedSignedUrl(path: string) {
   const cached = signedUrlMemoryCache.get(path);
@@ -25,7 +27,11 @@ function getCachedSignedUrl(path: string) {
   return cached.url;
 }
 
-function rememberSignedUrl(path: string, url: string) {
+function rememberSignedUrl(path: string, url: string, generation = signedUrlCacheGeneration) {
+  if (generation !== signedUrlCacheGeneration) return;
+
+  // Refresh insertion order so eviction behaves like a small LRU cache.
+  signedUrlMemoryCache.delete(path);
   if (signedUrlMemoryCache.size >= MEDIA_SIGNED_URL_CACHE_MAX_ENTRIES) {
     const oldestKey = signedUrlMemoryCache.keys().next().value as string | undefined;
     if (oldestKey) signedUrlMemoryCache.delete(oldestKey);
@@ -34,6 +40,21 @@ function rememberSignedUrl(path: string, url: string) {
     url,
     expiresAt: Date.now() + MEDIA_SIGNED_URL_MEMORY_TTL_MS,
   });
+}
+
+function trackSignedUrlRequest(path: string, request: Promise<string | null>) {
+  signedUrlInFlight.set(path, request);
+  const cleanup = () => {
+    if (signedUrlInFlight.get(path) === request) signedUrlInFlight.delete(path);
+  };
+  void request.then(cleanup, cleanup);
+  return request;
+}
+
+export function clearChatMediaSignedUrlCache() {
+  signedUrlCacheGeneration += 1;
+  signedUrlMemoryCache.clear();
+  signedUrlInFlight.clear();
 }
 
 type CreateImageMessageRow =
@@ -157,13 +178,27 @@ export async function createChatMediaSignedUrl(path: string) {
   const cached = getCachedSignedUrl(path);
   if (cached) return cached;
 
-  const { data, error } = await supabase.storage
-    .from(CHAT_MEDIA_BUCKET)
-    .createSignedUrl(path, CHAT_MEDIA_SIGNED_URL_SECONDS);
+  const inFlight = signedUrlInFlight.get(path);
+  if (inFlight) {
+    const pendingUrl = await inFlight;
+    if (!pendingUrl) throw new Error('Unable to create the media preview URL.');
+    return pendingUrl;
+  }
 
-  if (error) throw new Error(error.message);
-  rememberSignedUrl(path, data.signedUrl);
-  return data.signedUrl;
+  const generation = signedUrlCacheGeneration;
+  const request = (async () => {
+    const { data, error } = await supabase.storage
+      .from(CHAT_MEDIA_BUCKET)
+      .createSignedUrl(path, CHAT_MEDIA_SIGNED_URL_SECONDS);
+
+    if (error) throw new Error(error.message);
+    rememberSignedUrl(path, data.signedUrl, generation);
+    return data.signedUrl;
+  })();
+
+  const signedUrl = await trackSignedUrlRequest(path, request);
+  if (!signedUrl) throw new Error('Unable to create the media preview URL.');
+  return signedUrl;
 }
 
 export async function hydrateMessageMediaUrls(rows: MessagePageRow[]): Promise<MessagePageRow[]> {
@@ -177,29 +212,57 @@ export async function hydrateMessageMediaUrls(rows: MessagePageRow[]): Promise<M
 
   const signedByPath = new Map<string, string>();
   const missingPaths: string[] = [];
+  const pendingRequests: Promise<void>[] = [];
   for (const path of paths) {
     const cached = getCachedSignedUrl(path);
     if (cached) signedByPath.set(path, cached);
-    else missingPaths.push(path);
-  }
-
-  if (missingPaths.length > 0) {
-    const { data, error } = await supabase.storage
-      .from(CHAT_MEDIA_BUCKET)
-      .createSignedUrls(missingPaths, CHAT_MEDIA_SIGNED_URL_SECONDS);
-
-    if (error) {
-      console.warn('Unable to sign chat media URLs:', error.message);
-    } else {
-      for (const entry of data ?? []) {
-        const candidate = entry as { path?: string | null; signedUrl?: string | null };
-        if (candidate.path && candidate.signedUrl) {
-          signedByPath.set(candidate.path, candidate.signedUrl);
-          rememberSignedUrl(candidate.path, candidate.signedUrl);
-        }
+    else {
+      const inFlight = signedUrlInFlight.get(path);
+      if (inFlight) {
+        pendingRequests.push(inFlight.then((url) => {
+          if (url) signedByPath.set(path, url);
+        }).catch((error) => {
+          console.warn('Unable to sign chat media URL:', error);
+        }));
+      } else {
+        missingPaths.push(path);
       }
     }
   }
+
+  if (missingPaths.length > 0) {
+    const generation = signedUrlCacheGeneration;
+    const batchRequest = (async () => {
+      const urls = new Map<string, string>();
+      const { data, error } = await supabase.storage
+        .from(CHAT_MEDIA_BUCKET)
+        .createSignedUrls(missingPaths, CHAT_MEDIA_SIGNED_URL_SECONDS);
+
+      if (error) {
+        console.warn('Unable to sign chat media URLs:', error.message);
+        return urls;
+      }
+
+      for (const entry of data ?? []) {
+        const candidate = entry as { path?: string | null; signedUrl?: string | null };
+        if (candidate.path && candidate.signedUrl) {
+          urls.set(candidate.path, candidate.signedUrl);
+          rememberSignedUrl(candidate.path, candidate.signedUrl, generation);
+        }
+      }
+      return urls;
+    })();
+
+    missingPaths.forEach((path) => {
+      const request = batchRequest.then((urls) => urls.get(path) ?? null);
+      trackSignedUrlRequest(path, request);
+      pendingRequests.push(request.then((url) => {
+        if (url) signedByPath.set(path, url);
+      }));
+    });
+  }
+
+  await Promise.all(pendingRequests);
 
   return rows.map((row) => ({
     ...row,

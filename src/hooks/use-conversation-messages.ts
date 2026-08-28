@@ -43,6 +43,7 @@ import type {
   SupportedReaction,
 } from '@/types/message';
 import { SUPPORTED_REACTIONS } from '@/types/message';
+import { createTrailingRequestCoalescer } from '@/utils/trailing-request-coalescer';
 
 type RealtimeState = 'connecting' | 'connected' | 'reconnecting';
 type ServerMessage = Message | MessagePageRow;
@@ -304,8 +305,7 @@ export function useConversationMessages(
   const activeConversationKeyRef = useRef<string | null>(null);
   const sendingTextIdsRef = useRef(new Set<string>());
   const sendingImageIdsRef = useRef(new Set<string>());
-  const refreshLatestInFlightRef = useRef<Promise<void> | null>(null);
-  const refreshLatestQueuedRef = useRef(false);
+  const refreshLatestCoalescerRef = useRef(createTrailingRequestCoalescer());
 
   useEffect(() => {
     mountedRef.current = true;
@@ -335,14 +335,20 @@ export function useConversationMessages(
       return;
     }
 
+    const requestKey = `${currentUserId}:${conversationId}`;
+    const isCurrentConversation = () => (
+      mountedRef.current && activeConversationKeyRef.current === requestKey
+    );
+
     setIsInitialLoading(true);
     setLoadError(null);
 
     const pending = await listPendingTextMessages(currentUserId, conversationId);
+    if (!isCurrentConversation()) return;
 
     if (!isOnline) {
       const cached = await loadCachedConversationMessages(currentUserId, conversationId);
-      if (!mountedRef.current) return;
+      if (!isCurrentConversation()) return;
       const cachedMessages = cached?.data?.length
         ? mergeServerMessages([], cached.data, currentUserId)
         : [];
@@ -358,7 +364,7 @@ export function useConversationMessages(
 
     try {
       const page = await listConversationMessages(conversationId);
-      if (!mountedRef.current) return;
+      if (!isCurrentConversation()) return;
       const serverMessages = mergeServerMessages([], page, currentUserId);
       setMessages(mergePendingTextMessages(serverMessages, pending));
       setHasMore(page.length >= MESSAGE_PAGE_SIZE);
@@ -368,7 +374,7 @@ export function useConversationMessages(
     } catch (error) {
       console.warn('Unable to load messages:', error);
       const cached = await loadCachedConversationMessages(currentUserId, conversationId);
-      if (!mountedRef.current) return;
+      if (!isCurrentConversation()) return;
       const cachedMessages = cached?.data?.length
         ? mergeServerMessages([], cached.data, currentUserId)
         : [];
@@ -380,56 +386,46 @@ export function useConversationMessages(
         : 'Unable to load messages right now.');
       if (isRetryableNetworkError(error)) void checkConnectivity();
     } finally {
-      if (mountedRef.current) setIsInitialLoading(false);
+      if (isCurrentConversation()) setIsInitialLoading(false);
     }
   }, [checkConnectivity, conversationId, currentUserId, isOnline, markRead]);
 
   const refreshLatest = useCallback((): Promise<void> => {
     if (!conversationId || !currentUserId || !isOnline) return Promise.resolve();
+    const requestKey = `${currentUserId}:${conversationId}`;
 
-    if (refreshLatestInFlightRef.current) {
-      // Receipt/reconnect/app-state events can arrive together. Keep one request
-      // in flight and remember that one authoritative trailing refresh is needed.
-      refreshLatestQueuedRef.current = true;
-      return refreshLatestInFlightRef.current;
-    }
-
-    const request = (async () => {
-      do {
-        refreshLatestQueuedRef.current = false;
-        try {
-          const page = await listConversationMessages(conversationId);
-          if (!mountedRef.current) return;
-          setMessages((current) => mergeServerMessages(current, page, currentUserId));
-          setLoadError(null);
-          void cacheConversationMessages(currentUserId, conversationId, page);
-          void markRead();
-        } catch (error) {
-          console.warn('Unable to reconcile latest messages:', error);
-          if (isRetryableNetworkError(error)) void checkConnectivity();
-        }
-      } while (refreshLatestQueuedRef.current && mountedRef.current && isOnline);
-    })();
-
-    refreshLatestInFlightRef.current = request;
-    const cleanup = () => {
-      if (refreshLatestInFlightRef.current === request) refreshLatestInFlightRef.current = null;
-    };
-    void request.then(cleanup, cleanup);
-    return request;
+    return refreshLatestCoalescerRef.current.run(requestKey, async () => {
+      try {
+        const page = await listConversationMessages(conversationId);
+        if (!mountedRef.current || activeConversationKeyRef.current !== requestKey) return;
+        setMessages((current) => mergeServerMessages(current, page, currentUserId));
+        setLoadError(null);
+        void cacheConversationMessages(currentUserId, conversationId, page);
+        void markRead();
+      } catch (error) {
+        console.warn('Unable to reconcile latest messages:', error);
+        if (isRetryableNetworkError(error)) void checkConnectivity();
+      }
+    });
   }, [checkConnectivity, conversationId, currentUserId, isOnline, markRead]);
 
   const refreshOne = useCallback(async (messageId: string) => {
-    if (!currentUserId || !isOnline) return;
+    if (!conversationId || !currentUserId || !isOnline) return;
+    const requestKey = `${currentUserId}:${conversationId}`;
     try {
       const detail = await getMessageDetail(messageId);
-      if (!detail || !mountedRef.current) return;
+      if (
+        !detail
+        || !mountedRef.current
+        || activeConversationKeyRef.current !== requestKey
+        || detail.conversation_id !== conversationId
+      ) return;
       setMessages((current) => mergeServerMessage(current, detail, currentUserId));
     } catch (error) {
       console.warn('Unable to refresh changed message:', error);
       if (isRetryableNetworkError(error)) void checkConnectivity();
     }
-  }, [checkConnectivity, currentUserId, isOnline]);
+  }, [checkConnectivity, conversationId, currentUserId, isOnline]);
 
   useEffect(() => {
     const conversationKey = currentUserId && conversationId
@@ -761,7 +757,7 @@ export function useConversationMessages(
 
   const retryMessage = useCallback((clientMessageId: string) => {
     if (!conversationId || !currentUserId) return;
-    const target = messages.find(
+    const target = messagesRef.current.find(
       (message) => message.client_message_id === clientMessageId && message.localState === 'failed',
     );
     if (!target) return;
@@ -800,7 +796,7 @@ export function useConversationMessages(
     void enqueuePendingTextMessage(pending).then(() => {
       if (isOnline) void sendPendingText(pending);
     });
-  }, [conversationId, currentUserId, isOnline, messages, sendPendingImage, sendPendingText]);
+  }, [conversationId, currentUserId, isOnline, sendPendingImage, sendPendingText]);
 
   const editMessageContent = useCallback(async (messageId: string, body: string) => {
     setActionError(null);
@@ -857,7 +853,7 @@ export function useConversationMessages(
   }, [isOnline, refreshOne]);
 
   const toggleReaction = useCallback(async (messageId: string, emoji: SupportedReaction) => {
-    const target = messages.find((message) => message.id === messageId);
+    const target = messagesRef.current.find((message) => message.id === messageId);
     if (!target || target.deleted_at || target.isOptimistic) return false;
 
     setActionError(null);
@@ -875,7 +871,9 @@ export function useConversationMessages(
       setActionError(error instanceof Error ? error.message : 'Unable to update reaction.');
       return false;
     }
-  }, [isOnline, messages, refreshOne]);
+  }, [isOnline, refreshOne]);
+
+  const clearActionError = useCallback(() => setActionError(null), []);
 
   return useMemo(() => ({
     messages,
@@ -896,9 +894,10 @@ export function useConversationMessages(
     editMessageContent,
     deleteMessageForEveryone,
     toggleReaction,
-    clearActionError: () => setActionError(null),
+    clearActionError,
   }), [
     actionError,
+    clearActionError,
     deleteMessageForEveryone,
     editMessageContent,
     hasMore,

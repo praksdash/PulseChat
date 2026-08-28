@@ -1,8 +1,9 @@
 import type { Session, User } from '@supabase/supabase-js';
-import { createContext, type PropsWithChildren, useCallback, useEffect, useMemo, useState } from 'react';
+import { createContext, type PropsWithChildren, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { clearChatMediaSignedUrlCache } from '@/services/media-service';
 import { registerForPushNotifications, resumePushRegistration, suspendPushRegistration, unregisterNativePushNotifications } from '@/services/push-notification-service';
 import { disableStoredExpoPushToken } from '@/services/push-token-service';
 import type { Profile } from '@/types/profile';
@@ -37,6 +38,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const signedUrlCacheOwnerRef = useRef<string | null>(null);
+  const sessionUserId = session?.user.id;
+
+  useEffect(() => {
+    const nextOwner = sessionUserId ?? null;
+    if (signedUrlCacheOwnerRef.current === nextOwner) return;
+    clearChatMediaSignedUrlCache();
+    signedUrlCacheOwnerRef.current = nextOwner;
+  }, [sessionUserId]);
 
   const loadProfile = useCallback(async (userId: string) => {
     setIsProfileLoading(true);
@@ -60,12 +70,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const refreshProfile = useCallback(async () => {
-    if (!session?.user.id || !isSupabaseConfigured) {
+    if (!sessionUserId || !isSupabaseConfigured) {
       setProfile(null);
       return;
     }
-    await loadProfile(session.user.id);
-  }, [loadProfile, session?.user.id]);
+    await loadProfile(sessionUserId);
+  }, [loadProfile, sessionUserId]);
 
   useEffect(() => {
     if (Platform.OS === 'web' || !isSupabaseConfigured) return;
@@ -118,12 +128,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    if (!session?.user.id || !isSupabaseConfigured) {
+    if (!sessionUserId || !isSupabaseConfigured) {
       setProfile(null);
       return;
     }
-    void loadProfile(session.user.id);
-  }, [loadProfile, session?.user.id]);
+    void loadProfile(sessionUserId);
+  }, [loadProfile, sessionUserId]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!isSupabaseConfigured) return missingConfigurationMessage;

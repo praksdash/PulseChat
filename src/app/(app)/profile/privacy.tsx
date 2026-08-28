@@ -153,7 +153,7 @@ export default function PrivacyScreen() {
           <SurfaceCard style={styles.infoCard}>
             <AppText variant="bodyStrong">What blocking does</AppText>
             <AppText variant="caption" tone="secondary">
-              Blocking closes direct messaging in both directions, hides activity and typing between the pair, prevents new direct pushes, and removes both users from each other's people search. Shared group messages remain available to group members.
+              Blocking closes direct messaging in both directions, hides activity and typing between the pair, prevents new direct pushes, and removes both users from each other’s people search. Shared group messages remain available to group members.
             </AppText>
           </SurfaceCard>
 

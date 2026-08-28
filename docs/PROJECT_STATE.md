@@ -1,9 +1,9 @@
 # PulseChat Project State
 
 ## Current phase
-Phase 18 — settings (implementation ready; verification pending)
+Phase 20 — Prototype V1 performance optimization (implementation and automated checks complete; two-device acceptance pending)
 
-## Completed
+## Implemented
 - Phase 0 product scope/architecture
 - Phase 1 development environment
 - Phase 2 navigation
@@ -22,6 +22,14 @@ Phase 18 — settings (implementation ready; verification pending)
 - Phase 15 push notifications + Android/web notification diagnostics
 - Phase 16 global search
 - Phase 17 block/report/privacy
+- Phase 18 settings/account controls
+- Phase 19 offline/error handling
+- Phase 20 Prototype V1 performance/correctness fixes
+
+## Acceptance status
+- Local TypeScript, ESLint, keyed-coalescer unit tests (3/3), and Android Metro export passed on 2026-08-28 UTC.
+- Supabase migrations/RLS, Edge Function deployment, Firebase/FCM setup, and the final two-Android-device acceptance test remain owner-environment checks.
+- Do not mark Phase 20 accepted or begin Phase 21 until the V1 checklist in `PHASE20_README.txt` passes on real devices.
 
 ## Phase 15 implementation
 - `expo-notifications` SDK 57 integration
@@ -75,10 +83,8 @@ Phase 18 — settings (implementation ready; verification pending)
 - iOS client code is included, but iOS credentials/device testing remain part of the later iOS production phase.
 
 ## Git checkpoint
-`feat: add secure push notifications`
+Recommended: `fix: harden phase 20 prototype v1 performance`
 
-## Next task
-Verify Phase 18 settings. After acceptance, Phase 19 — offline/error handling.
 - Phase 15 hotfix: Android notification channel no longer passes `sound: "default"` as a custom sound filename; system notification sound behavior is used instead.
 
 ## Phase 15 notification completion fix
@@ -159,24 +165,25 @@ None.
 ## Phase 19 verification
 Run `npm run typecheck`, then perform the offline/reconnect acceptance test in `docs/TESTING.md` on a real Android device and web.
 
-## Next task
-After Phase 19 acceptance: Phase 20 — performance optimization.
-
 ## Phase 20 implementation
 - Chats and message FlatLists now use bounded initial render counts, batch sizes and virtualization windows.
-- ChatRow, Avatar, MessageBubble and MediaMessageBubble are memoized around visual/state-bearing props.
+- ChatRow, Avatar, MessageBubble and MediaMessageBubble are memoized around visual, state, and interaction props.
+- The message render callback remains stable during composer and unrelated screen-state updates.
 - Chat/message timestamp formatters are reused rather than allocated per row render.
-- Overlapping active-chat latest reconciliation requests are coalesced with a trailing authoritative refresh.
+- Active-chat latest reconciliation is keyed by user + conversation, coalesced with the newest trailing authoritative refresh, and covered by unit tests.
+- Stale chat-list, summary, message-page, and message-detail responses cannot overwrite a newer route/request.
 - Chat-list activity bursts are coalesced before summary refresh.
-- Private Storage signed URLs use a bounded 50-minute in-memory cache and batch signing for cache misses.
-- Encrypted offline cache writes skip identical payloads to reduce AES/AsyncStorage work.
+- Private Storage signed URLs use a bounded 50-minute in-memory cache, batch signing, per-path in-flight deduplication, and account-change invalidation.
+- Encrypted offline cache writes are serialized per key and skip identical payloads.
+- AsyncStorage v3 cache deletion uses `removeMany`.
 - Initial online mount no longer triggers a duplicate reconnect refresh in Chats/conversation summary flows.
+- Dependencies are locked; TypeScript, ESLint, unit-test, and Android export commands are reproducible.
 
 ## Phase 20 migration
 None.
 
 ## Phase 20 verification
-Run `npm run typecheck`, `npx expo start -c`, then the Phase 20 tests in `docs/TESTING.md`. Optional Android bundle validation: `npm run check:android`.
+Automated local verification completed with `npm run verify` and `npm run check:android`. Run `npx expo start -c`, then complete the Phase 20 V1 tests in `docs/TESTING.md` on two configured Android devices.
 
 ## Next task
-After Phase 20 acceptance: Phase 21 — security review.
+Complete the two-device V1 acceptance test. Only after Phase 20 acceptance: Phase 21 — security review.

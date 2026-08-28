@@ -119,6 +119,9 @@ function areMessageBubblePropsEqual(previous: MessageBubbleProps, next: MessageB
     && previous.replySenderLabel === next.replySenderLabel
     && previous.replyText === next.replyText
     && previous.myReaction === next.myReaction
+    && previous.onReactionPress === next.onReactionPress
+    && previous.onRetry === next.onRetry
+    && previous.onLongPress === next.onLongPress
     && sameReactions(previous.reactions, next.reactions);
 }
 

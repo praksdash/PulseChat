@@ -74,6 +74,7 @@ function toChatRow(item: ConversationListItem, currentUserId: string | undefined
 export default function ChatsScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
+  const userId = user?.id;
   const { isOnline } = useConnectivity();
   const [query, setQuery] = useState('');
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
@@ -82,14 +83,30 @@ export default function ChatsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isShowingCached, setIsShowingCached] = useState(false);
   const wasOnlineRef = useRef(isOnline);
+  const mountedRef = useRef(true);
+  const loadSequenceRef = useRef(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      loadSequenceRef.current += 1;
+    };
+  }, []);
 
   const loadConversations = useCallback(async (mode: 'load' | 'refresh' | 'background' = 'load') => {
+    const requestSequence = ++loadSequenceRef.current;
+    const isLatestRequest = () => (
+      mountedRef.current && loadSequenceRef.current === requestSequence
+    );
+
     if (mode === 'load') setIsLoading(true);
     if (mode === 'refresh') setIsRefreshing(true);
     setError(null);
 
-    if (!isOnline && user?.id) {
-      const cached = await loadCachedConversationList(user.id);
+    if (!isOnline && userId) {
+      const cached = await loadCachedConversationList(userId);
+      if (!isLatestRequest()) return;
       if (cached?.data?.length) {
         setConversations(cached.data);
         setIsShowingCached(true);
@@ -104,12 +121,14 @@ export default function ChatsScreen() {
 
     try {
       const data = await listMyConversations();
+      if (!isLatestRequest()) return;
       setConversations(data);
       setIsShowingCached(false);
-      if (user?.id) void cacheConversationList(user.id, data);
+      if (userId) void cacheConversationList(userId, data);
     } catch (loadError) {
       console.warn('Unable to load conversations:', loadError);
-      const cached = user?.id ? await loadCachedConversationList(user.id) : null;
+      const cached = userId ? await loadCachedConversationList(userId) : null;
+      if (!isLatestRequest()) return;
       if (cached?.data?.length) {
         setConversations(cached.data);
         setIsShowingCached(true);
@@ -118,10 +137,12 @@ export default function ChatsScreen() {
         setError('Unable to load your conversations right now.');
       }
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (isLatestRequest()) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  }, [isOnline, user?.id]);
+  }, [isOnline, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -142,10 +163,10 @@ export default function ChatsScreen() {
   const chatRows = useMemo(() => {
     const rows = new Map<string, ChatRowModel>();
     conversations.forEach((conversation) => {
-      rows.set(conversation.conversation_id, toChatRow(conversation, user?.id));
+      rows.set(conversation.conversation_id, toChatRow(conversation, userId));
     });
     return rows;
-  }, [conversations, user?.id]);
+  }, [conversations, userId]);
 
   const unreadCount = useMemo(
     () => conversations.reduce((sum, item) => sum + (item.unread_count ?? 0), 0),

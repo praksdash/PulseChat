@@ -100,6 +100,7 @@ function getReplyText(reply: ReplyPreview | ChatMessage | null | undefined) {
 export default function ConversationScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
+  const userId = user?.id;
   const { isOnline } = useConnectivity();
   const params = useLocalSearchParams<{
     conversationId?: string | string[];
@@ -130,6 +131,16 @@ export default function ConversationScreen() {
   const [focusedMessageId, setFocusedMessageId] = useState<string | null>(requestedFocusMessageId ?? null);
   const messageListRef = useRef<FlatList<ChatMessage> | null>(null);
   const wasOnlineRef = useRef(isOnline);
+  const mountedRef = useRef(true);
+  const summaryLoadSequenceRef = useRef(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      summaryLoadSequenceRef.current += 1;
+    };
+  }, []);
 
   const {
     messages,
@@ -151,7 +162,7 @@ export default function ConversationScreen() {
     deleteMessageForEveryone,
     toggleReaction,
     clearActionError,
-  } = useConversationMessages(conversationId, user?.id);
+  } = useConversationMessages(conversationId, userId);
 
   const isDirectConversation = summary?.kind === 'direct';
   const directMessagingAvailable = !isDirectConversation
@@ -164,11 +175,16 @@ export default function ConversationScreen() {
   );
   const { peerTyping, updateTyping, stopTyping } = useTypingIndicator({
     conversationId,
-    currentUserId: user?.id,
+    currentUserId: userId,
     enabled: Boolean(isOnline && isDirectConversation && relationship?.messaging_available),
   });
 
   const loadSummary = useCallback(async () => {
+    const requestSequence = ++summaryLoadSequenceRef.current;
+    const isLatestRequest = () => (
+      mountedRef.current && summaryLoadSequenceRef.current === requestSequence
+    );
+
     if (!conversationId) {
       setSummaryError('This conversation link is invalid.');
       setIsLoadingSummary(false);
@@ -179,7 +195,8 @@ export default function ConversationScreen() {
     setSummaryError(null);
 
     if (!isOnline) {
-      const cached = user?.id ? await loadCachedConversationSummary(user.id, conversationId) : null;
+      const cached = userId ? await loadCachedConversationSummary(userId, conversationId) : null;
+      if (!isLatestRequest()) return;
       if (cached?.data) {
         setSummary(cached.data);
         setRelationship(null);
@@ -193,18 +210,20 @@ export default function ConversationScreen() {
 
     try {
       const data = await getConversationSummary(conversationId);
+      if (!isLatestRequest()) return;
       setSummary(data);
       if (!data) {
         setRelationship(null);
         setSummaryError('This conversation is unavailable or you are no longer a member.');
       } else {
-        if (user?.id) void cacheConversationSummary(user.id, conversationId, data);
+        if (userId) void cacheConversationSummary(userId, conversationId, data);
         if (data.kind === 'direct' && data.peer_user_id) {
           try {
-            setRelationship(await getUserRelationshipState(data.peer_user_id));
+            const nextRelationship = await getUserRelationshipState(data.peer_user_id);
+            if (isLatestRequest()) setRelationship(nextRelationship);
           } catch (relationshipError) {
             console.warn('Unable to load direct privacy state:', relationshipError);
-            setRelationship(null);
+            if (isLatestRequest()) setRelationship(null);
           }
         } else {
           setRelationship(null);
@@ -212,7 +231,8 @@ export default function ConversationScreen() {
       }
     } catch (error) {
       console.warn('Unable to load conversation:', error);
-      const cached = user?.id ? await loadCachedConversationSummary(user.id, conversationId) : null;
+      const cached = userId ? await loadCachedConversationSummary(userId, conversationId) : null;
+      if (!isLatestRequest()) return;
       if (cached?.data) {
         setSummary(cached.data);
         setRelationship(null);
@@ -221,9 +241,9 @@ export default function ConversationScreen() {
         setSummaryError('Unable to load this conversation right now.');
       }
     } finally {
-      setIsLoadingSummary(false);
+      if (isLatestRequest()) setIsLoadingSummary(false);
     }
-  }, [conversationId, isOnline, user?.id]);
+  }, [conversationId, isOnline, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -276,7 +296,7 @@ export default function ConversationScreen() {
   }, [requestedFocusMessageId]);
 
   useEffect(() => {
-    if (!focusedMessageId || !conversationId || !user?.id || isInitialLoading) return undefined;
+    if (!focusedMessageId || !conversationId || !userId || isInitialLoading) return undefined;
     let cancelled = false;
 
     void loadMessageSearchWindow(focusedMessageId).then((found) => {
@@ -286,7 +306,7 @@ export default function ConversationScreen() {
     return () => {
       cancelled = true;
     };
-  }, [conversationId, focusedMessageId, isInitialLoading, loadMessageSearchWindow, user?.id]);
+  }, [conversationId, focusedMessageId, isInitialLoading, loadMessageSearchWindow, userId]);
 
   useEffect(() => {
     if (!focusedMessageId || !isSearchWindow) return;
@@ -399,11 +419,11 @@ export default function ConversationScreen() {
     }
   };
 
-  const openMessageActions = (message: ChatMessage) => {
+  const openMessageActions = useCallback((message: ChatMessage) => {
     if (message.isOptimistic || message.deleted_at || message.localState === 'failed') return;
     clearActionError();
     setSelectedMessage(message);
-  };
+  }, [clearActionError]);
 
   const startReply = () => {
     if (!selectedMessage) return;
@@ -485,15 +505,15 @@ export default function ConversationScreen() {
     setReportTarget(null);
   };
 
-  const replyLabel = (reply: ReplyPreview | null | undefined) => {
+  const replyLabel = useCallback((reply: ReplyPreview | null | undefined) => {
     if (!reply) return null;
-    if (reply.senderId === user?.id) return 'You';
+    if (reply.senderId === userId) return 'You';
     if (summary?.kind === 'group') return reply.senderDisplayName ?? 'Group member';
     return name;
-  };
+  }, [name, summary?.kind, userId]);
 
-  const frameGroupIncoming = (item: ChatMessage, content: ReactNode) => {
-    const outgoing = item.sender_id === user?.id;
+  const frameGroupIncoming = useCallback((item: ChatMessage, content: ReactNode) => {
+    const outgoing = item.sender_id === userId;
     if (summary?.kind !== 'group' || outgoing) return content;
 
     const senderName = item.senderDisplayName ?? 'Group member';
@@ -508,10 +528,10 @@ export default function ConversationScreen() {
         </View>
       </View>
     );
-  };
+  }, [summary?.kind, userId]);
 
-  const renderMessage = ({ item }: { item: ChatMessage }) => {
-    const outgoing = item.sender_id === user?.id;
+  const renderMessage = useCallback(({ item }: { item: ChatMessage }) => {
+    const outgoing = item.sender_id === userId;
     const repliedToLabel = replyLabel(item.replyPreview);
     const repliedToText = item.replyPreview ? getReplyText(item.replyPreview) : null;
 
@@ -582,11 +602,20 @@ export default function ConversationScreen() {
       />
     );
     return (
-        <View style={[styles.messageRow, item.id === focusedMessageId && { backgroundColor: theme.colors.primarySoft }]}>
+        <View style={[styles.messageRow, item.id === focusedMessageId && { backgroundColor: theme.colors.primarySoft }]}> 
           {frameGroupIncoming(item, bubble)}
         </View>
       );
-  };
+  }, [
+    focusedMessageId,
+    frameGroupIncoming,
+    openMessageActions,
+    replyLabel,
+    retryMessage,
+    theme.colors.primarySoft,
+    toggleReaction,
+    userId,
+  ]);
 
   const renderMessages = () => {
     if (isInitialLoading && messages.length === 0) {

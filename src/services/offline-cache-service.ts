@@ -13,6 +13,7 @@ const MAX_CACHED_CONVERSATIONS = 60;
 const MAX_CACHED_MESSAGES = 60;
 const MAX_WRITE_FINGERPRINTS = 160;
 const lastWrittenPayload = new Map<string, string>();
+const writeQueueByKey = new Map<string, Promise<void>>();
 
 type CacheEnvelope<T> = {
   savedAt: string;
@@ -44,22 +45,36 @@ async function readEnvelope<T>(key: string): Promise<CacheEnvelope<T> | null> {
   }
 }
 
-async function writeEnvelope<T>(key: string, data: T) {
-  try {
-    const payloadFingerprint = JSON.stringify(data);
-    if (lastWrittenPayload.get(key) === payloadFingerprint) return;
-
-    const envelope: CacheEnvelope<T> = { savedAt: new Date().toISOString(), data };
-    await localVaultSet(key, JSON.stringify(envelope));
-
-    if (lastWrittenPayload.size >= MAX_WRITE_FINGERPRINTS && !lastWrittenPayload.has(key)) {
-      const oldestKey = lastWrittenPayload.keys().next().value as string | undefined;
-      if (oldestKey) lastWrittenPayload.delete(oldestKey);
-    }
-    lastWrittenPayload.set(key, payloadFingerprint);
-  } catch (error) {
-    console.warn('Unable to write PulseChat offline cache:', error);
+function rememberWrittenPayload(key: string, payload: string) {
+  lastWrittenPayload.delete(key);
+  if (lastWrittenPayload.size >= MAX_WRITE_FINGERPRINTS) {
+    const oldestKey = lastWrittenPayload.keys().next().value as string | undefined;
+    if (oldestKey) lastWrittenPayload.delete(oldestKey);
   }
+  lastWrittenPayload.set(key, payload);
+}
+
+function writeEnvelope<T>(key: string, data: T) {
+  const serializedData = JSON.stringify(data);
+  const previousWrite = writeQueueByKey.get(key) ?? Promise.resolve();
+
+  // Serialize each cache key so overlapping refreshes cannot finish out of
+  // order and overwrite a newer snapshot with an older one.
+  const operation = previousWrite.catch(() => undefined).then(async () => {
+    try {
+      if (lastWrittenPayload.get(key) === serializedData) return;
+      const savedAt = JSON.stringify(new Date().toISOString());
+      await localVaultSet(key, `{"savedAt":${savedAt},"data":${serializedData}}`);
+      rememberWrittenPayload(key, serializedData);
+    } catch (error) {
+      console.warn('Unable to write PulseChat offline cache:', error);
+    }
+  });
+
+  writeQueueByKey.set(key, operation);
+  return operation.finally(() => {
+    if (writeQueueByKey.get(key) === operation) writeQueueByKey.delete(key);
+  });
 }
 
 export async function cacheConversationList(userId: string, conversations: ConversationListItem[]) {
@@ -104,12 +119,19 @@ export async function loadCachedConversationMessages(userId: string, conversatio
 export async function clearUserOfflineCache(userId: string) {
   if (!userId) return;
   try {
-    const keys = await localVaultGetAllKeys();
-    const userKeys = keys.filter((key: string) => (
+    const belongsToUser = (key: string) => (
       key === conversationListKey(userId)
       || key.startsWith(`${CACHE_PREFIX}:messages:${userId}:`)
       || key.startsWith(`${CACHE_PREFIX}:summary:${userId}:`)
-    ));
+    );
+
+    const pendingWrites = [...writeQueueByKey.entries()]
+      .filter(([key]) => belongsToUser(key))
+      .map(([, operation]) => operation);
+    if (pendingWrites.length > 0) await Promise.all(pendingWrites);
+
+    const keys = await localVaultGetAllKeys();
+    const userKeys = keys.filter(belongsToUser);
     if (userKeys.length > 0) {
       await localVaultMultiRemove(userKeys);
       userKeys.forEach((key: string) => lastWrittenPayload.delete(key));

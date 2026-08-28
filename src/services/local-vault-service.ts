@@ -86,5 +86,5 @@ export async function localVaultGetAllKeys() {
 
 export async function localVaultMultiRemove(keys: readonly string[]) {
   if (keys.length === 0) return;
-  await AsyncStorage.multiRemove([...keys]);
+  await AsyncStorage.removeMany([...keys]);
 }

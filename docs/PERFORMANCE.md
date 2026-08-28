@@ -1,35 +1,70 @@
 # PulseChat performance strategy
 
-## Phase 20 goals
-PulseChat optimizes the early-product hot paths without introducing premature Telegram-scale infrastructure. PostgreSQL remains the source of truth, Supabase Realtime remains an acceleration layer, and client optimizations must never weaken RLS or correctness.
+## Phase 20 V1 goal
+
+Optimize the two-device Prototype V1 hot paths without creating a second source of truth. PostgreSQL remains authoritative, Supabase Realtime only accelerates updates, and every optimization preserves RLS, membership checks, receipts, and `client_message_id` retry deduplication.
 
 ## Rendering budgets
-- Chats: render 14 rows initially, then batches of 10 with a 7-window virtualization budget.
-- Messages: render 24 rows initially, then batches of 12 with a 9-window virtualization budget.
-- Android enables clipped off-screen rows; web keeps clipping disabled to avoid DOM/measurement edge cases.
-- Chat rows, avatars and message bubbles are memoized around visual/state props.
 
-## Network request coalescing
-The active conversation coalesces overlapping latest-page reconciliation requests caused by receipt, reconnect and foreground events. If another refresh is requested while one is running, PulseChat records a trailing refresh instead of dropping the request. This reduces duplicate work without risking a stale final state.
+- Chats: 14 initial rows, batches of 10, window size 7.
+- Messages: 24 initial rows, batches of 12, window size 9.
+- Native lists clip off-screen rows where the platform is reliable; web clipping remains disabled.
+- Chat rows, avatars, text bubbles, and media bubbles are memoized.
+- The message render callback is stable across composer keystrokes and unrelated screen state.
+- Bubble comparators include interaction callbacks; an online/offline transition cannot leave Retry or React bound to stale state.
+- `expo-image` uses memory/disk caching and a URI recycling key for virtualized avatars/media.
 
-## Realtime burst behavior
-Conversation activity notifications are coalesced over a short window before the Chats list is refreshed. The durable message itself is not delayed; only redundant list-summary refresh work is combined.
+## Network ordering and coalescing
 
-## Media URL strategy
-Private Storage media continues to use signed URLs. A signed URL is kept only in process memory and reused for 50 minutes, below the one-hour server expiry. Missing URLs are created in a single Storage batch request. No signed URL is persisted by Phase 20.
+Each active-chat latest refresh is keyed by authenticated user and conversation. If receipt, reconnect, foreground, and Realtime events arrive together:
 
-## Offline cache write strategy
-Phase 19 encrypted native caches remain unchanged semantically. Phase 20 fingerprints the plain serialized payload in process memory and skips a write when the payload is byte-identical to the most recently written value for that cache key. This avoids unnecessary AES encryption and AsyncStorage writes.
+1. one request runs;
+2. additional same-key requests collapse into one trailing run;
+3. the newest trailing task is used; and
+4. another conversation uses a different key and proceeds independently.
+
+Responses also carry current-screen guards. Old chat-list, summary, page, or message-detail responses are ignored after a newer request or route change, preventing slow requests from overwriting newer UI state.
+
+Conversation activity broadcasts are coalesced over a short window before Chats/unread refreshes. Durable message delivery is never delayed by that timer.
+
+## Pagination boundary
+
+- Message history uses the existing `(created_at, id)` cursor RPC and loads 30 messages per page.
+- The Prototype V1 Chats list is capped at 50 conversations by the existing RPC. This is sufficient for the stated V1 test and is documented honestly; cursor pagination for hundreds of chats is a later product-scale task.
+- Search already uses its own limits/cursors.
+
+## Private media URLs
+
+- Signed URLs live only in process memory and expire from the client cache after 50 minutes, below the one-hour server lifetime.
+- Missing paths are batch-signed.
+- Concurrent requests for the same path share one in-flight promise.
+- The cache is bounded to 300 paths and refreshed as an LRU-style map.
+- Cache generation and all entries are cleared when the authenticated account changes, so a signed URL cannot be reused by a later account in the same app process.
+- Signed URLs are not intentionally persisted by Phase 20. Existing offline message snapshots may contain the most recently rendered URL, but server authorization is still required to mint a fresh one.
+
+## Offline cache writes
+
+- Recent chat lists, summaries, and message pages keep the Phase 19 native encrypted-envelope format.
+- Each key has a serialized write queue, preventing an older slow write from finishing after a newer snapshot.
+- A byte-identical serialized payload is not encrypted/written twice in the same process.
+- Fingerprints and pending writes are bounded/cleared with the user cache.
+- AsyncStorage v3 uses `removeMany` for batch removal.
 
 ## Correctness constraints
-Performance work must preserve:
-- RLS and membership authorization
-- client_message_id retry deduplication
-- group sender/reply/reaction metadata
-- message status transitions
-- offline outbox semantics
-- push/mute/privacy behavior
-- theme updates
 
-## Future profiling
-Phase 26 production hardening can add telemetry for startup time, JS exceptions, API latency and push delivery. Phase 20 deliberately avoids adding a paid observability dependency.
+Phase 20 must preserve:
+
+- conversation/group membership authorization and RLS;
+- optimistic text/image behavior and duplicate prevention;
+- sender/reply/reaction projections;
+- sent/delivered/read transitions and unread counts;
+- offline outbox replay;
+- push, mute, privacy, block, and report behavior;
+- theme changes and accessible interactions; and
+- app restart persistence.
+
+## Verification budget
+
+Automated local checks cover TypeScript, ESLint, coalescer concurrency semantics, and Android Metro export. Physical-device profiling should use a V1-sized dataset: 20+ chats, 100+ messages in one chat, a media-heavy chat, burst delivery, offline/reconnect, and account switching.
+
+Startup telemetry, API latency dashboards, crash reporting, push-receipt polling, and production alerts remain Phase 26 work.

@@ -82,8 +82,10 @@ Receipt updates are broadcast as a monotonic `through_created_at` cursor instead
 `message_receipts.read_at IS NULL` is the authoritative unread source. `conversation_members.last_read_at` is also maintained as a useful conversation read cursor for later query/UX features.
 
 ## Deferred
-- Phase 16+: search and the remaining product-hardening roadmap
-- Phase 18: user-facing notification/mute settings
+- calls, secret-chat E2EE, stories, bots, channels, desktop and multi-device clients
+- expanded audio/video/voice/file messaging
+- chat-list cursor pagination beyond the V1 50-conversation cap
+- Phase 21 security review after V1 device acceptance
 - Phase 26: asynchronous Expo push-receipt polling/monitoring
 
 ## Phase 12 image send flow
@@ -215,11 +217,13 @@ UI / Realtime burst
       ↓
 short coalescing + in-flight request dedupe
       ↓
-existing paginated Supabase RPCs
+bounded Chats RPC + cursor-paginated message/search RPCs
       ↓
 PostgreSQL authoritative state
 ```
 
-Message/chat FlatLists use bounded render windows and batched cell mounting. Hot row components are memoized around state-bearing props. Private media signing uses a bounded in-memory cache whose TTL is shorter than the one-hour signed URL lifetime. Phase 19 encrypted offline writes skip identical payloads so reconnect/focus reconciliation does not repeatedly encrypt and write the same cache snapshot.
+Message/chat FlatLists use bounded render windows, batched cell mounting, stable render callbacks, and correctness-safe memo comparators. Latest-message reconciliation is keyed by user + conversation and applies only when the route is still current. Chats and summaries use request sequence guards so slow responses cannot replace newer state.
+
+Private media signing uses batch requests, per-path in-flight deduplication, and a bounded in-memory cache whose TTL is shorter than the one-hour signed URL lifetime. Authentication changes invalidate the cache. Phase 19 encrypted offline writes are serialized per key and skip identical payloads so reconnect/focus reconciliation neither writes stale snapshots out of order nor repeats encryption/storage work.
 
 No Phase 20 optimization bypasses RLS, durable message persistence, receipts, privacy rules or retry idempotency.

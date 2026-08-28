@@ -49,8 +49,8 @@ Verify:
 ## Regression
 Auth, persistent session, profile/avatar, discovery, chat creation, message send/retry, pagination and realtime receive must still work.
 
-## Deferred
-Typing/presence is Phase 11; media is Phase 12.
+## Phase 10 historical boundary
+Typing/presence was added in Phase 11 and image media in Phase 12; their regression suites follow below.
 
 ## Phase 11 manual tests
 
@@ -192,14 +192,34 @@ Typing/presence is Phase 11; media is Phase 12.
 12. Regression: direct/group text, images, reply/edit/delete/reactions, search, privacy, mute and push behavior still function online.
 
 ## Phase 20 performance manual tests
-1. Run `npm run typecheck` and start with `npx expo start -c`.
-2. Open Chats and repeatedly type/clear local chat search while scrolling. No stale row, incorrect avatar, or wrong tap target may appear.
-3. Open a conversation with a long history, rapidly scroll toward older messages, and confirm pagination loads once per boundary without duplicate visible messages.
-4. Send/receive a burst of messages. The active conversation must update immediately and the Chats preview/unread count must reconcile without repeated loading spinners.
-5. In a group, verify sender avatar/name, replies and reactions still refresh after incoming messages despite memoized bubbles.
-6. Open an image-heavy chat twice in the same app session. Images should reuse signed/media caches and must still open in the full-screen viewer.
-7. Edit, delete and react to a message; only the affected bubble state should change and all actions must still work.
-8. Toggle System/Light/Dark while Chats and a message screen are mounted. Memoized rows must adopt the new theme immediately.
-9. Repeat the Phase 19 offline queue/reconnect test; queued text/images and encrypted cached reads must behave identically.
-10. Run `npm run check:android` before marking the phase complete if the local Android/Expo environment is available.
-11. Regression: notifications, mute, search, groups, block/report/privacy, account deletion and realtime receipts remain functional.
+### Automated gate
+
+1. Run `npm ci` from a clean checkout/package extraction.
+2. Run `npm run verify`; TypeScript, ESLint, and all three coalescer tests must pass.
+3. Run `npm run check:android`; Metro must export the Android bundle.
+4. Confirm the expected Firebase file is present before a native push-enabled build: `google-services.json` at project root.
+
+### Prototype V1 two-device gate
+
+1. Install a development/preview build on Android phones A and B.
+2. Create two email/password accounts, set both profiles, discover the other user, and create one direct conversation.
+3. Exchange realtime text and images in both directions.
+4. Verify unread counts plus sent/delivered/read transitions.
+5. Background and terminate B normally (do not Android force-stop), send from A, receive one push, and tap it into the exact chat.
+6. Create a small group and exchange group messages.
+7. Close/reopen both apps and confirm conversation/message persistence.
+
+### Performance/correctness regression
+
+1. Open Chats with 20+ conversations if available; type/clear local search while scrolling. No stale row, incorrect avatar, flicker, or wrong tap target may appear.
+2. Open a chat with 100+ messages, scroll through older pages repeatedly, and confirm no duplicate rows or stuck pagination.
+3. Send/receive a burst. Active messages update immediately and Chats preview/unread state reconciles without repeated spinners.
+4. Navigate from chat A to chat B while A is reconciling on a slow connection. A's result must never appear in B or prevent B's refresh.
+5. Open an image-heavy chat twice. Cached images must render correctly and repeated concurrent refreshes must not cause loading churn.
+6. Sign out, sign in as another test account on the same app process, and confirm no media from the first account appears from memory cache.
+7. Go offline, send two texts, reconnect, and confirm one durable row per `client_message_id`.
+8. While a failed message is visible, transition offline → online and tap Retry. The current connectivity state must be used.
+9. Edit/delete/react, toggle theme, and confirm memoized rows still update correctly.
+10. Regression: notifications, mute, search, groups, block/report/privacy, account deletion, and realtime receipts remain functional.
+
+Do not mark Phase 20 accepted until the Prototype V1 two-device gate passes. Automated export alone does not verify FCM, OS permissions, background delivery, Supabase RLS, or physical-device persistence.

@@ -132,6 +132,7 @@ function MediaMessageBubbleComponent({
               contentFit="cover"
               transition={120}
               cachePolicy="memory-disk"
+              recyclingKey={uri}
             />
           ) : (
             <View style={styles.placeholder}>
@@ -180,6 +181,10 @@ function areMediaMessageBubblePropsEqual(previous: MediaMessageBubbleProps, next
     && previous.replySenderLabel === next.replySenderLabel
     && previous.replyText === next.replyText
     && previous.myReaction === next.myReaction
+    && previous.onReactionPress === next.onReactionPress
+    && previous.onOpen === next.onOpen
+    && previous.onRetry === next.onRetry
+    && previous.onLongPress === next.onLongPress
     && sameReactions(previous.reactions, next.reactions);
 }
 
