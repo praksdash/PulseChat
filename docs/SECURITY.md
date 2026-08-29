@@ -1,5 +1,21 @@
 # PulseChat Security
 
+## Phase 25 Play policy and reviewer boundary
+
+- Store declarations state transport encryption but explicitly do not claim
+  secret-chat/end-to-end encryption.
+- Data safety includes account/profile identifiers, messages, photos, app
+  interactions, ephemeral search processing, other user content and push-device
+  identifiers; it does not claim ads, sales or an independent security review.
+- Account deletion describes the real cascade and the retained anonymized
+  shared-conversation-history rule instead of promising blanket erasure.
+- Support contact/URLs are owner-only inputs and reviewer credentials must stay
+  outside source, EAS uploads, screenshots and defect reports.
+- Screenshots must use non-sensitive test data and may not expose email,
+  notification tokens, private messages, service keys or developer overlays.
+- Play service-account/upload/signing material remains private infrastructure;
+  this package contains no Play Console credential or reviewer password.
+
 ## Phase 24 release credential boundary
 
 - `.env`, `google-services.json`, Firebase service-account files, keystores,

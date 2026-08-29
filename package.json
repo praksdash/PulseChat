@@ -86,7 +86,14 @@
     "build:android:development": "eas build --platform android --profile development --non-interactive",
     "build:android:preview": "eas build --platform android --profile preview --non-interactive",
     "build:android:production": "eas build --platform android --profile production --non-interactive",
-    "qa:phase24": "npm run vendor:noble-ciphers && npm run verify:security && npm run qa:preflight:source && npm run audit:accessibility && npm run release:audit:source && npm run check:android:native:source && npm run check:android:phase24 && npm run check:web:phase24"
+    "qa:phase24": "npm run vendor:noble-ciphers && npm run verify:security && npm run qa:preflight:source && npm run audit:accessibility && npm run release:audit:source && npm run check:android:native:source && npm run check:android:phase24 && npm run check:web:phase24",
+    "play:audit": "node scripts/phase25-play-readiness.mjs",
+    "play:audit:source": "node scripts/phase25-play-readiness.mjs --source-only",
+    "play:render-public": "node scripts/phase25-render-public.mjs",
+    "play:prepare": "npm run play:audit && npm run play:render-public",
+    "check:android:phase25": "node scripts/phase24-expo-export.mjs android dist-phase25-android-check",
+    "check:web:phase25": "node scripts/phase24-expo-export.mjs web dist-phase25-web-check",
+    "qa:phase25": "npm run vendor:noble-ciphers && npm run verify:security && npm run qa:preflight:source && npm run audit:accessibility && npm run release:audit:source && npm run check:android:native:source && npm run play:audit:source && npm run check:android:phase25 && npm run check:web:phase25"
   },
   "private": true
 }

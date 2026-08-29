@@ -396,3 +396,39 @@ install, upgrade, push, and two-phone physical evidence.
 2. Close every PulseChat localhost tab. Clear only the localhost PulseChat
    session storage and reopen the app.
 3. Sign in again and load Profile. `JWT issued at future` must not recur.
+
+## Phase 25 Play Store internal-beta tests
+
+### Source gate
+
+1. Extract the Phase 25 package into a clean directory and run `npm ci`.
+2. Run `npm run qa:phase25`.
+3. Require TypeScript, ESLint, 22 unit tests, secret scanning, the high/critical
+   runtime dependency gate, source preflight, accessibility/release/native
+   audits, Phase 25 Play source audit, and Android/Web exports to pass.
+4. The source Play audit may warn only that owner inputs and authentic phone
+   screenshots are still required; it must report zero failures.
+
+### Configured policy/listing gate
+
+1. Create the ignored `release/play-store/owner-inputs.json` with monitored
+   contact details, owned public HTTPS URLs and true owner confirmations.
+2. Capture at least two authentic candidate phone screenshots according to the
+   asset README; never use mock/fabricated product screens.
+3. Run `npm run play:audit`; zero failures are allowed.
+4. Run `npm run play:render-public`, inspect the three generated pages, host
+   them and verify all URLs while signed out.
+5. Complete Play Data safety/content-rating/app-access forms using the current
+   console wording and preserve submitted evidence.
+
+### Internal beta gate
+
+1. Build one source-provenance-recorded production AAB and upload it only to
+   Play internal testing.
+2. Resolve all release-blocking automated/pre-launch findings; any changed
+   candidate uses a higher versionCode and repeats all gates.
+3. Run the full two-phone V1, push, offline/restart, privacy, accessibility and
+   account-deletion regressions against the exact internal build.
+4. Run a controlled 5–20 adult tester beta and record blockers/retests.
+5. Complete `docs/PHASE25_ACCEPTANCE.md`. Source readiness or a successful AAB
+   upload alone does not accept Phase 25.

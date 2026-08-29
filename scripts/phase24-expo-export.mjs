@@ -9,8 +9,8 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const platform = process.argv[2];
 const outputDirectory = process.argv[3];
 
-if (!['android', 'web'].includes(platform) || !outputDirectory?.startsWith('dist-phase24-')) {
-  process.stderr.write('Usage: node scripts/phase24-expo-export.mjs <android|web> <dist-phase24-* directory>\n');
+if (!['android', 'web'].includes(platform) || !/^dist-phase(?:24|25)-[a-z0-9-]+$/i.test(outputDirectory ?? '')) {
+  process.stderr.write('Usage: node scripts/phase24-expo-export.mjs <android|web> <dist-phase24-*|dist-phase25-* directory>\n');
   process.exit(1);
 }
 

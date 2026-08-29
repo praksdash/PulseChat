@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "scope": "PulseChat Prototype V1 Android internal beta",
+  "containsAds": false,
+  "sellsData": false,
+  "sharesDataForIndependentThirdPartyPurposes": false,
+  "encryptedInTransit": true,
+  "endToEndEncrypted": false,
+  "accountDeletionAvailableInApp": true,
+  "accountDeletionPublicRequestRequired": true,
+  "independentSecurityReviewCompleted": false,
+  "serviceProviders": [
+    "Supabase (authentication, database, storage, realtime and Edge Functions)",
+    "Expo Push Service (push delivery)",
+    "Google Firebase Cloud Messaging (Android push transport)"
+  ],
+  "dataCollected": [
+    {
+      "playCategory": "Personal info / Email address",
+      "required": true,
+      "ephemeral": false,
+      "purposes": ["App functionality", "Account management"]
+    },
+    {
+      "playCategory": "Personal info / Name",
+      "required": true,
+      "ephemeral": false,
+      "purposes": ["App functionality", "Account management"]
+    },
+    {
+      "playCategory": "Personal info / User IDs",
+      "required": true,
+      "ephemeral": false,
+      "purposes": ["App functionality", "Account management", "Security and fraud prevention"]
+    },
+    {
+      "playCategory": "Messages / Other in-app messages",
+      "required": false,
+      "ephemeral": false,
+      "purposes": ["App functionality"]
+    },
+    {
+      "playCategory": "Photos and videos / Photos",
+      "required": false,
+      "ephemeral": false,
+      "purposes": ["App functionality"]
+    },
+    {
+      "playCategory": "App activity / App interactions",
+      "required": true,
+      "ephemeral": false,
+      "purposes": ["App functionality", "Security and fraud prevention"]
+    },
+    {
+      "playCategory": "App activity / In-app search history",
+      "required": false,
+      "ephemeral": true,
+      "purposes": ["App functionality"]
+    },
+    {
+      "playCategory": "App activity / Other user-generated content",
+      "required": false,
+      "ephemeral": false,
+      "purposes": ["App functionality", "Account management", "Security and fraud prevention"]
+    },
+    {
+      "playCategory": "Device or other IDs / Device or other IDs",
+      "required": false,
+      "ephemeral": false,
+      "purposes": ["App functionality"]
+    }
+  ],
+  "notCollectedByApp": [
+    "Precise or approximate location",
+    "Contacts",
+    "Financial information",
+    "Health and fitness information",
+    "Audio",
+    "Files and documents",
+    "Advertising data"
+  ],
+  "retentionNotes": [
+    "Account, profile, membership, settings and push-token records are deleted through the in-app account-deletion flow.",
+    "Shared conversation messages and photos may remain as anonymized conversation history after account deletion so other members retain the conversation record.",
+    "Delete-for-everyone immediately redacts message metadata; physical object cleanup is best effort.",
+    "Infrastructure providers may retain limited security and operational logs under their configured retention and processor terms."
+  ]
+}

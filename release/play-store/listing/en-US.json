@@ -1,0 +1,7 @@
+{
+  "language": "en-US",
+  "appName": "PulseChat",
+  "shortDescription": "Simple messaging for people and small groups.",
+  "fullDescription": "PulseChat is a focused messaging app for direct conversations and small groups.\n\nMessage with confidence\n• Send realtime text messages and photos\n• Reply, edit, delete and react to messages\n• See unread, delivered and read states\n• Find people, conversations and messages\n\nStay in control\n• Create and manage small group chats\n• Mute conversations and choose notification preferences\n• Control people-search and activity visibility\n• Block or report unwanted interactions\n• Choose light, dark or system appearance\n\nBuilt for everyday reliability\n• Read recent conversations during a connection problem\n• Queue text messages and retry them after reconnecting\n• Open the exact conversation from a notification\n• Delete your account from inside the app\n\nPulseChat requires an account. Message content is protected by authenticated access and server-enforced conversation membership. PulseChat does not claim end-to-end encryption.",
+  "releaseNotes": "Initial PulseChat internal beta: direct and group messaging, photos, message actions, search, notifications, privacy controls and offline text recovery."
+}

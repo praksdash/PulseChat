@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Delete your PulseChat account</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.6; }
+    body { max-width: 780px; margin: 0 auto; padding: 32px 20px 64px; }
+    h1, h2 { line-height: 1.2; } a { color: #0b6fde; }
+  </style>
+</head>
+<body>
+  <h1>Delete your PulseChat account</h1>
+  <p>Developer: {{DEVELOPER_NAME}}</p>
+
+  <h2>Delete inside the app</h2>
+  <ol>
+    <li>Sign in to PulseChat.</li>
+    <li>Open Profile → Settings → Account.</li>
+    <li>Select Delete account, review the consequences and confirm.</li>
+  </ol>
+
+  <h2>Request deletion without the app</h2>
+  <p>Email <a href="mailto:{{SUPPORT_EMAIL}}?subject=PulseChat%20account%20deletion%20request">{{SUPPORT_EMAIL}}</a> from the email address used for your PulseChat account. Use the subject “PulseChat account deletion request.” Do not send a password, authentication token or message content. We may ask you to complete a safe ownership-verification step before deletion.</p>
+
+  <h2>What is deleted</h2>
+  <p>The authentication account and linked profile, conversation membership, settings, privacy choices, blocks, reports and push-token registrations are removed. Profile and empty-group avatar cleanup is attempted.</p>
+
+  <h2>What may remain</h2>
+  <p>Messages and photos shared with other conversation members may remain as anonymized conversation history. Message delete-for-everyone redacts durable message and attachment metadata immediately; physical image cleanup is best effort. Limited security, deletion-request and operational records may be retained only as needed for completion, abuse prevention, provider retention or legal obligations.</p>
+
+  <p>For details, read the <a href="{{PRIVACY_POLICY_URL}}">PulseChat Privacy Policy</a>.</p>
+</body>
+</html>

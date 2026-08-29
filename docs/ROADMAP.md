@@ -2,23 +2,17 @@
 
 ## Current
 
-Phase 24 — Android release candidate source. Release identity, PulseChat assets,
-EAS profiles, private Firebase injection, remote-signing policy, native smoke
-tests, owner runbooks, Windows Metro compatibility, and the forward limiter
-ambiguity fix are complete. The owner must apply/verify the migration. A signed
-preview APK plus clean-install, upgrade, push, and two-phone evidence remain
-before Phase 24 can be accepted.
-Phase 22 and Phase 23 also remain open until their physical-device records are
-signed; later source work does not waive those gates.
+Phase 25 — Play Store internal-beta readiness. Source-owned privacy/deletion
+templates, Data safety/content-rating answers, listing copy, Play icon/feature
+graphic, authentic screenshot specification, beta runbook, acceptance sheet and
+automated audit are complete. Owner contact/URLs, hosted public pages, authentic
+candidate screenshots, Play Console upload, pre-launch report and beta evidence
+remain before Phase 25 can be accepted.
 
-## Next phases
+Phase 22, Phase 23 and Phase 24 physical/signed-build records remain open; later
+source work does not waive those gates.
 
-### Phase 25 — Play Store internal beta readiness
-
-- Prepare privacy policy, support contact, store listing assets, content rating, and Data safety answers.
-- Upload to the Play Console internal-testing track and resolve pre-launch findings.
-- Run a small controlled beta and fix release-blocking defects only.
-- Exit gate: V1 approved for internal beta distribution.
+## Next phase
 
 ### Phase 26 — Production hardening and observability
 
@@ -34,3 +28,7 @@ Do not mark Phase 24 accepted until `docs/PHASE24_ACCEPTANCE.md` is signed for a
 clean-source EAS preview APK. Phase 22 and Phase 23 remain independently
 unaccepted until their records are completed; automated exports, native
 prebuilds, and an unsigned package satisfy no physical-device gate.
+
+Do not mark Phase 25 accepted from source artifacts. Its exact production AAB,
+Play policy forms, internal-track/pre-launch evidence and controlled beta must
+be recorded in `docs/PHASE25_ACCEPTANCE.md`.

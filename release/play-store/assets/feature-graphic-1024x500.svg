@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0C7EF3"/>
+      <stop offset="1" stop-color="#0758C7"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="20" flood-color="#001D4D" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="500" fill="url(#bg)"/>
+  <circle cx="884" cy="70" r="190" fill="#FFFFFF" opacity="0.06"/>
+  <circle cx="900" cy="460" r="260" fill="#001D4D" opacity="0.08"/>
+  <g transform="translate(74 80) scale(.33)" filter="url(#shadow)">
+    <path fill="#FFFFFF" d="M176 170C176 77 251 2 344 2h163c80 0 148 56 165 131h72c94 0 170 76 170 170 0 54-25 103-65 134l31 95c7 23-18 42-38 29l-111-74H588c-75 0-140-48-163-116H289l-111 74c-20 13-45-6-38-29l31-95C131 290 106 241 106 187c0-6 0-11 1-17h69z"/>
+    <path fill="none" stroke="#0B6FDE" stroke-width="46" stroke-linecap="round" stroke-linejoin="round" d="M219 270h178l67-177 75 290 77-177 50 64h131"/>
+  </g>
+  <text x="430" y="220" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="78" font-weight="700">PulseChat</text>
+  <text x="434" y="286" fill="#EAF5FF" font-family="Arial, Helvetica, sans-serif" font-size="31" font-weight="400">Chat clearly. Stay connected.</text>
+  <rect x="434" y="328" width="250" height="4" rx="2" fill="#7FC0FF"/>
+</svg>

@@ -1,0 +1,19 @@
+{
+  "developerName": "",
+  "supportEmail": "",
+  "privacyPolicyUrl": "https://",
+  "accountDeletionUrl": "https://",
+  "supportUrl": "https://",
+  "effectiveDate": "2026-08-29",
+  "appAccess": {
+    "reviewerAccountReady": false,
+    "instructionsStoredOutsideSource": true
+  },
+  "policyConfirmation": {
+    "adultsOnlyInternalBeta": false,
+    "noAds": true,
+    "deletionWorkflowTested": false,
+    "processorTermsReviewed": false,
+    "dataSafetyAnswersReviewedInPlayConsole": false
+  }
+}

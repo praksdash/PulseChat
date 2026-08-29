@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "questionnaireBasis": "Prototype V1 source review; confirm against the current Play Console questionnaire wording before submission.",
+  "recommendedTargetAudience": "Adults 18+ for the controlled internal beta",
+  "interactiveElements": {
+    "usersInteract": true,
+    "usersShareText": true,
+    "usersSharePhotos": true,
+    "usersShareLocation": false,
+    "digitalPurchases": false,
+    "advertising": false
+  },
+  "userGeneratedContent": {
+    "present": true,
+    "blockingAvailable": true,
+    "reportingAvailable": true,
+    "privacyControlsAvailable": true,
+    "proactiveContentFiltering": false,
+    "moderationModel": "Reactive reports only; no automated or pre-publication moderation is claimed."
+  },
+  "appProvidedContent": {
+    "violence": false,
+    "sexualContent": false,
+    "profanity": false,
+    "gambling": false,
+    "controlledSubstances": false
+  },
+  "importantAnsweringRule": "Do not select Everyone/children solely because the app itself provides no mature editorial content. Disclose messaging, photo sharing, user interaction, blocking and reporting exactly as the console asks."
+}

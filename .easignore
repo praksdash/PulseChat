@@ -17,6 +17,8 @@ GoogleService-Info.plist
 *service-account*.json
 fcm-service-account*.json
 credentials.json
+release/play-store/owner-inputs.json
+*reviewer-credentials*
 
 # Signing material must remain in EAS remote credentials, never source upload.
 *.jks

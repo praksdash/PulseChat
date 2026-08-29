@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "phase": 25,
+  "status": "source-ready-owner-inputs-required",
+  "applicationId": "com.prakashdash.pulsechat",
+  "versionName": "1.0.0",
+  "versionCode": 24,
+  "defaultLanguage": "en-US",
+  "category": "COMMUNICATION",
+  "targetAudience": "adults-18-plus-internal-beta",
+  "containsAds": false,
+  "offersInAppPurchases": false,
+  "endToEndEncrypted": false,
+  "storeAssets": {
+    "icon": {
+      "path": "release/play-store/assets/play-icon-512.png",
+      "width": 512,
+      "height": 512
+    },
+    "featureGraphic": {
+      "path": "release/play-store/assets/feature-graphic-1024x500.png",
+      "sourcePath": "release/play-store/assets/feature-graphic-1024x500.svg",
+      "width": 1024,
+      "height": 500
+    },
+    "screenshotsDirectory": "release/play-store/screenshots",
+    "minimumPhoneScreenshots": 2
+  },
+  "ownerInputsPath": "release/play-store/owner-inputs.json"
+}

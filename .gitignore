@@ -45,5 +45,9 @@ google-services.json
 *service-account*.json
 fcm-service-account*.json
 
+# Play Console owner/reviewer configuration
+release/play-store/owner-inputs.json
+*reviewer-credentials*
+
 # Supabase CLI local state
 .supabase/

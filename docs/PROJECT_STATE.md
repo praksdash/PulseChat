@@ -1,7 +1,9 @@
 # PulseChat Project State
 
 ## Current phase
-Phase 24 — Prototype V1 Android release candidate (source engineering complete; owner EAS build and physical-device QA pending)
+Phase 25 — Play Store internal-beta readiness (source engineering complete;
+owner Play configuration, exact signed AAB, pre-launch and controlled-beta
+evidence pending)
 
 ## Implemented
 - Phase 0 product scope/architecture
@@ -29,8 +31,12 @@ Phase 24 — Prototype V1 Android release candidate (source engineering complete
 - Phase 22 Prototype V1 QA/correctness hardening candidate
 - Phase 23 Prototype V1 UX/accessibility polish candidate
 - Phase 24 Prototype V1 Android release engineering candidate
+- Phase 25 Prototype V1 Play Store internal-beta readiness candidate
 
 ## Acceptance status
+- Phase 25 policy/listing sources and automated readiness audit are complete.
+  Real support/public URLs, screenshots, Play forms/upload, pre-launch and beta
+  evidence remain owner-side requirements.
 - Phase 24 release identity, assets, EAS profiles, private-config boundary, and native Android generation are source-controlled. The final clean Phase 24 gate is recorded at handoff.
 - No signed EAS artifact is claimed: the implementation environment had no EAS login/token or Android SDK. Owner EAS build provenance and physical-device evidence remain required.
 - Phase 23 TypeScript, ESLint, unit tests (13/13), accessibility audit, and source preflight passed during implementation on 2026-08-29 UTC.
@@ -294,12 +300,32 @@ signed preview APK with `npm run build:android:preview`. Complete
 `docs/PHASE24_ACCEPTANCE.md`; local automation does not claim EAS signing,
 installability, upgrade continuity, FCM delivery, or physical-device behavior.
 
-## Next task
-Apply and verify the Phase 24 limiter migration, synchronize the Windows system
-clock, refresh the Web session, and repeat queued/fresh message sends. Then
-create the signed preview APK and complete `docs/PHASE24_ACCEPTANCE.md` on two
-phones. The still-open Phase 22 and Phase 23 physical evidence can be collected
-during the same run but retains its own sign-off records.
+## Phase 25 implementation
+- Accurate privacy, account-deletion and support HTML templates.
+- Data safety declarations grounded in the deployed V1 data model, including
+  service providers, anonymized shared-history retention and no E2EE claim.
+- Adult internal-beta content-rating/UGC working answers.
+- Play-compliant listing copy, 512 px icon and 1024 × 500 opaque feature graphic.
+- Authentic signed-build screenshot capture specification; no fabricated app
+  screenshots are included.
+- Owner-only contact/URL/app-access configuration remains ignored from source.
+- Configured renderer produces public pages only after owner inputs validate.
+- Source/configured Play readiness audits validate identity, character limits,
+  policy facts, asset dimensions, screenshots and owner confirmations.
+- Internal track, pre-launch, controlled beta, rollback and sign-off runbooks.
 
-After Phase 24 acceptance, follow `docs/ROADMAP.md`: Phase 25 Play Store
-internal beta readiness, then Phase 26 production hardening/observability.
+## Phase 25 migration
+None.
+
+## Phase 25 verification
+Run `npm ci` and `npm run qa:phase25`. Source-only readiness may report exactly
+the expected owner-input and authentic-screenshot warnings. Before submission,
+provide the ignored owner inputs/screenshots, run `npm run play:audit` and
+`npm run play:render-public`, host the pages, build the exact production AAB and
+complete `docs/PHASE25_ACCEPTANCE.md` in Play Console.
+
+## Next task
+Complete the still-open Phase 22–24 physical/signed-build evidence, configure
+the Phase 25 owner inputs and public pages, capture authentic screenshots, and
+upload the exact production AAB to Play internal testing. Phase 26 production
+hardening/observability follows after this beta-readiness package.
