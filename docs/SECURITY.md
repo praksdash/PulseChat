@@ -1,5 +1,29 @@
 # PulseChat Security
 
+## Phase 24 release credential boundary
+
+- `.env`, `google-services.json`, Firebase service-account files, keystores,
+  credentials files, and generated build output are excluded from EAS/source
+  archives.
+- EAS release profiles fail closed if Firebase client configuration is absent.
+  `GOOGLE_SERVICES_JSON` must be a project-scoped secret file variable for
+  development, preview, and production builds.
+- Public Supabase client values are still client-visible by design; security
+  depends on RLS/RPC authorization, not hiding those values. They remain out of
+  source packages to avoid tying a reusable package to one owner environment.
+- Android signing keys remain in owner-controlled EAS remote credentials. The
+  signing certificate SHA-256 must be recorded for every accepted candidate so
+  an unexpected signing-lineage change blocks release.
+- The FCM V1 service-account credential is server/signing infrastructure and
+  must be configured separately through EAS credentials. It must never be
+  substituted for or bundled with the client `google-services.json` file.
+- VersionCode changes are deliberate source reviews. Production auto-increment
+  is disabled so build provenance can be reproduced from the package.
+- The Metro-safe AES-GCM runtime is generated from locked `@noble/ciphers`
+  source, distributed with its MIT notice, and SHA-256 checked by the release
+  audit. Runtime code imports only the local reviewed bundle, avoiding
+  platform-specific package-subpath resolution without weakening encryption.
+
 ## Authentication and client keys
 Only Supabase Project URL + publishable key are exposed through `EXPO_PUBLIC_*`. Secret/service-role credentials must never be embedded in the mobile app.
 

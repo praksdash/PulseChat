@@ -1,5 +1,26 @@
 # PulseChat Architecture
 
+## Phase 24 Android release boundary
+
+The repository remains Expo-managed: Android native source is generated only
+for smoke/build output and is not committed. `app.json` owns stable public
+identity and reviewed art, while `app.config.js` resolves the ignored local
+Firebase client file or the EAS `GOOGLE_SERVICES_JSON` file variable. Release
+profiles fail closed when that input is missing.
+
+`eas.json` separates three artifact purposes: a development-client internal
+APK, a preview internal signed APK used for acceptance, and a production store
+AAB. All use owner-controlled remote signing. The committed release baseline
+locks application ID, versionCode/versionName, EAS project/CLI identity, output
+types, and asset hashes; the Phase 24 audits compare both source and generated
+Android resources against it.
+
+Phase 24 does not change the runtime data plane: the React Native client still
+talks directly to the Supabase Auth/PostgreSQL/Realtime/Storage boundaries and
+the existing Edge Functions. Firebase client config enables the native FCM
+integration; the FCM V1 service credential remains server-side EAS
+infrastructure and is never shipped as an app asset.
+
 ## Current application architecture
 
 ```text

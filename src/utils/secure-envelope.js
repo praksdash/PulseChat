@@ -1,10 +1,10 @@
-const { gcm } = require('@noble/ciphers/aes');
 const {
+  gcm,
   bytesToHex,
   bytesToUtf8,
   hexToBytes,
   utf8ToBytes,
-} = require('@noble/ciphers/utils');
+} = require('../vendor/noble-ciphers-runtime.js');
 
 const ENVELOPE_VERSION = 2;
 const KEY_BYTES = 32;

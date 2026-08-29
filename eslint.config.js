@@ -3,7 +3,7 @@ const { defineConfig } = require('eslint/config');
 const expoConfig = require('eslint-config-expo/flat');
 
 module.exports = defineConfig([
-  { ignores: ['dist*/**', '.expo/**'] },
+  { ignores: ['dist*/**', '.expo/**', 'src/vendor/noble-ciphers-runtime.js'] },
   expoConfig,
   {
     rules: {

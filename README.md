@@ -4,7 +4,9 @@ PulseChat is a Telegram-inspired messaging prototype built with React Native, Ex
 
 ## Current milestone
 
-Phase 23 — Prototype V1 UX/accessibility candidate. Source-level polish and repeatable accessibility/QA gates are implemented; physical TalkBack/font-scale testing and the Phase 22 two-Android-phone acceptance remain owner-environment work.
+Phase 24 — Prototype V1 Android release candidate. Reproducible release source,
+PulseChat brand assets, EAS profiles, and release/native audits are implemented;
+the owner-signed EAS preview APK and physical two-phone acceptance remain open.
 
 ## Prototype V1 success scope
 
@@ -78,17 +80,32 @@ Existing reply/edit/delete/reaction, privacy, settings, search, typing, and pres
 - keyboard, progress, error, permission, privacy-load, and blocked-user recovery states are explicit; and
 - a static accessibility audit plus three tests prevent regressions in these V1 fixes.
 
+## Phase 24 Android release engineering
+
+- fixed Android identity at `com.prakashdash.pulsechat`, version `1.0.0`,
+  versionCode `24`;
+- source-controlled local versioning and exact EAS CLI 22.0.0;
+- PulseChat launcher, adaptive/themed, splash, notification, and Web artwork;
+- fail-closed Firebase release config with EAS secret file injection;
+- remote-signed development/preview APK and production AAB profiles;
+- release-identity/asset audit and generated-native Android smoke test; and
+- a signed-artifact runbook plus clean-install, upgrade, push, and two-phone
+  acceptance record.
+
 ## Local setup
 
 1. Install Node.js and npm supported by Expo SDK 57.
 2. Run `npm ci`.
 3. Copy `.env.example` to `.env` and add the Supabase URL and publishable key.
-4. Apply the Supabase migrations in order, including Phase 21.
+4. Apply the Supabase migrations in order, including the Phase 24 rate-limiter fix.
 5. For real Android push notifications, add your Firebase `google-services.json` at the project root and complete `PHASE15_SETUP.md`.
-6. Run `supabase/phase21_verify.sql`, and redeploy `send-message-push` plus `delete-account`.
+6. Run `supabase/phase21_verify.sql` and `supabase/phase24_verify.sql`, then
+   redeploy `send-message-push` plus `delete-account`.
 7. Run `npm run qa:preflight`; correct every failure before building for devices.
-8. Run `npm run qa:phase23`.
-9. Start with `npx expo start -c` or install the same EAS development/preview build on both test phones.
+8. Run `npm run qa:phase24` from the clean source package.
+9. Restore owner-only private inputs and run `npm run release:gate:configured`.
+10. Follow `docs/PHASE24_RELEASE_RUNBOOK.md` to build and install the same
+    signed EAS preview APK on both phones.
 
 ## Verification commands
 
@@ -97,9 +114,18 @@ npm run verify
 npm run verify:security
 npm run qa:preflight
 npm run audit:accessibility
-npm run qa:phase23
+npm run release:audit:source
+npm run check:android:native:source
+npm run qa:phase24
 ```
 
-The Android export validates the JavaScript bundle. A real development/preview build plus physical devices is still required to verify TalkBack, font/display scaling, FCM delivery, background notifications, camera/gallery permissions, realtime receipts, and restart persistence.
+The Android export and native prebuild validate source/generated configuration,
+not signing or installation. A signed EAS preview APK plus physical devices is
+still required to verify upgrades, TalkBack/font scaling, FCM delivery, OS
+permissions, and complete V1 acceptance.
 
-See `PHASE23_README.txt`, `docs/PHASE23_ACCESSIBILITY_REVIEW.md`, `docs/PHASE23_ACCEPTANCE.md`, `docs/PHASE22_ACCEPTANCE.md`, `docs/PROJECT_STATE.md`, `docs/ROADMAP.md`, and `docs/TESTING.md` for the exact handoff state.
+See `PHASE24_README.txt`, `docs/PHASE24_RELEASE_RUNBOOK.md`,
+`docs/PHASE24_ACCEPTANCE.md`, `docs/PHASE24_RELEASE_REPORT.md`,
+`docs/PHASE23_ACCEPTANCE.md`, `docs/PHASE22_ACCEPTANCE.md`,
+`docs/PROJECT_STATE.md`, `docs/ROADMAP.md`, and `docs/TESTING.md` for the exact
+handoff state.

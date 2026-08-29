@@ -1,0 +1,37 @@
+# Dependencies and generated output
+node_modules/
+.expo/
+dist/
+dist-*/
+web-build/
+android/
+ios/
+
+# Local/private configuration is supplied through EAS Environment Variables.
+.env
+.env.*
+!.env.example
+google-services.json
+GoogleService-Info.plist
+*firebase-admin*.json
+*service-account*.json
+fcm-service-account*.json
+credentials.json
+
+# Signing material must remain in EAS remote credentials, never source upload.
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Local tooling
+.supabase/
+.kotlin/
+*.tsbuildinfo
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.idea/
+.DS_Store

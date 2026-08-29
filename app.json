@@ -4,42 +4,51 @@
     "slug": "PulseChat",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/icon-phase24.png",
     "scheme": "pulsechat",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "versionCode": 24,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#0969DA",
+        "foregroundImage": "./assets/images/android-icon-foreground-phase24.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome-phase24.png"
       },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
       "predictiveBackGestureEnabled": false,
       "package": "com.prakashdash.pulsechat",
       "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon-phase24.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-notifications",
         {
-          "color": "#208AEF",
+          "color": "#0969DA",
+          "icon": "./assets/images/notification-icon-phase24.png",
           "defaultChannel": "messages"
         }
       ],
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#0969DA",
+          "image": "./assets/images/splash-icon-phase24.png",
+          "imageWidth": 124,
+          "dark": {
+            "backgroundColor": "#07111C",
+            "image": "./assets/images/splash-icon-phase24.png"
+          }
         }
       ],
       [

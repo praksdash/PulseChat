@@ -2,19 +2,16 @@
 
 ## Current
 
-Phase 23 — UI/UX and accessibility candidate. Source polish and local automation
-are complete. Physical Android TalkBack/font-scale evidence remains before
-Phase 23 can be accepted. Phase 22's signed two-phone acceptance also remains
-open; Phase 23 proceeded because the owner explicitly requested the next phase.
+Phase 24 — Android release candidate source. Release identity, PulseChat assets,
+EAS profiles, private Firebase injection, remote-signing policy, native smoke
+tests, owner runbooks, Windows Metro compatibility, and the forward limiter
+ambiguity fix are complete. The owner must apply/verify the migration. A signed
+preview APK plus clean-install, upgrade, push, and two-phone evidence remain
+before Phase 24 can be accepted.
+Phase 22 and Phase 23 also remain open until their physical-device records are
+signed; later source work does not waive those gates.
 
 ## Next phases
-
-### Phase 24 — Android release engineering
-
-- Finalize application ID, version/build numbers, adaptive icon, splash, signing, Firebase config, and EAS profiles.
-- Produce reproducible signed internal/preview builds.
-- Validate upgrade, clean install, permissions, background push, and release configuration.
-- Exit gate: installable signed Android release candidate from a clean source package.
 
 ### Phase 25 — Play Store internal beta readiness
 
@@ -33,6 +30,7 @@ open; Phase 23 proceeded because the owner explicitly requested the next phase.
 
 The following remain deliberately uncommitted and must not delay Prototype V1: iOS production release, desktop/multi-device synchronization, voice/video calls, secret-chat E2EE, audio/video/files, stories, bots, channels, broadcasts, and Telegram-scale infrastructure.
 
-Do not mark Phase 23 accepted until `docs/PHASE23_ACCEPTANCE.md` is signed.
-Phase 22 remains independently unaccepted until `docs/PHASE22_ACCEPTANCE.md` is
-completed; automated exports alone satisfy neither physical-device gate.
+Do not mark Phase 24 accepted until `docs/PHASE24_ACCEPTANCE.md` is signed for a
+clean-source EAS preview APK. Phase 22 and Phase 23 remain independently
+unaccepted until their records are completed; automated exports, native
+prebuilds, and an unsigned package satisfy no physical-device gate.

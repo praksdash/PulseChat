@@ -322,3 +322,77 @@ Use `docs/PHASE23_ACCEPTANCE.md` as the signed record.
 Do not mark Phase 23 accepted from static checks or exports. TalkBack spoken
 output, focus order, physical font/display sizing, OS dialogs, and device
 behavior require signed manual evidence.
+
+## Phase 24 Android release tests
+
+### Clean-source gate
+
+1. Extract the Phase 24 source package into a clean directory.
+2. Confirm no `.env`, `google-services.json`, service-account file, keystore,
+   `.expo`, native directory, or prior export is present.
+3. Run `npm ci` and `npm run qa:phase24`.
+4. Require TypeScript, ESLint, 18 unit tests, secret scan, high/critical runtime
+   dependency audit, source preflight, accessibility audit, release audit,
+   source-only native Android prebuild, and Android/Web exports to pass.
+5. Confirm the release audit reports `com.prakashdash.pulsechat`, `1.0.0` (24),
+   and EAS CLI 22.0.0 with no failure.
+
+### Configured and signed-build gate
+
+1. Apply `202608290018_phase24_rate_limit_ambiguity_fix.sql` and run
+   `supabase/phase24_verify.sql`; require `Phase 24 verification passed.`
+2. Restore owner `.env` and `google-services.json` outside source control.
+3. Run `npm run release:gate:configured`; zero failures are allowed.
+4. Configure the matching values as EAS development/preview/production project
+   environment variables, using a secret file variable named
+   `GOOGLE_SERVICES_JSON`.
+5. Configure/reuse the owner remote Android keystore and FCM V1 credential.
+6. Run `npm run build:android:preview` from the same clean source.
+7. Record the EAS build ID/URL, APK SHA-256, `1.0.0` / `24`, and signing
+   certificate SHA-256 in `docs/PHASE24_ACCEPTANCE.md`.
+
+### Physical release gate
+
+1. Clean-install the exact preview APK on phones A and B.
+2. Upgrade a retained-state installation with that APK; a signature mismatch or
+   lost session/cache is blocking.
+3. Verify launcher/themed icon, splash, app label, notification small icon, and
+   contextual camera/notification permissions.
+4. Repeat the Prototype V1 two-account path: authentication, profiles,
+   discovery, direct text/images, receipts/unread, background and normally
+   terminated push, exact notification routing, group chat, offline text replay,
+   and restart persistence.
+5. Repeat TalkBack, largest practical font/display, light/dark, deep-link/back,
+   and failure recovery regressions from Phase 23.
+6. Sign every required Phase 24 acceptance row against the same APK digest.
+
+Do not mark Phase 24 accepted from a successful source gate, native prebuild, or
+EAS build alone. Acceptance requires signed artifact provenance plus clean
+install, upgrade, push, and two-phone physical evidence.
+
+### Windows Metro regression
+
+1. On Windows, install from the clean lockfile with `npm ci`.
+2. Run `npx expo start -c`, then press `w`.
+3. Web and server-render bundles must load the local
+   `src/vendor/noble-ciphers-runtime.js` file without asking Metro to resolve a
+   noble-ciphers package subpath.
+4. Open the native development build from the same Metro server and verify that
+   encrypted auth/cache startup completes without a red screen.
+
+### Phase 24 rate-limiter regression
+
+1. Apply the Phase 24 migration after Phase 21.
+2. Run `supabase/phase24_verify.sql`; require `Phase 24 verification passed.`
+3. On Web, send a fresh text message and allow a previously queued message to
+   retry. Neither path may return an ambiguous `actor_user_id` error.
+4. Send two different messages rapidly; both must insert once, and the private
+   rate-limit row must update without client access to that table.
+
+### Windows JWT clock recovery
+
+1. Enable Windows **Set time automatically** and **Set time zone automatically**,
+   then select **Sync now**.
+2. Close every PulseChat localhost tab. Clear only the localhost PulseChat
+   session storage and reopen the app.
+3. Sign in again and load Profile. `JWT issued at future` must not recur.

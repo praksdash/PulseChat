@@ -1,18 +1,46 @@
 {
   "cli": {
-    "version": ">= 22.0.0",
-    "appVersionSource": "remote"
+    "version": "22.0.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "environment": "development",
+      "credentialsSource": "remote",
+      "env": {
+        "PULSECHAT_BUILD_PROFILE": "development",
+        "PULSECHAT_REQUIRE_PRIVATE_CONFIG": "1"
+      },
+      "android": {
+        "buildType": "apk"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "environment": "preview",
+      "credentialsSource": "remote",
+      "env": {
+        "PULSECHAT_BUILD_PROFILE": "preview",
+        "PULSECHAT_REQUIRE_PRIVATE_CONFIG": "1"
+      },
+      "android": {
+        "buildType": "apk"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "distribution": "store",
+      "environment": "production",
+      "credentialsSource": "remote",
+      "autoIncrement": false,
+      "env": {
+        "PULSECHAT_BUILD_PROFILE": "production",
+        "PULSECHAT_REQUIRE_PRIVATE_CONFIG": "1"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      }
     }
   },
   "submit": {

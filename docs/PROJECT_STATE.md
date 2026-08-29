@@ -1,7 +1,7 @@
 # PulseChat Project State
 
 ## Current phase
-Phase 23 — Prototype V1 UX/accessibility candidate (source polish and local automation complete; owner TalkBack/font-scale QA pending)
+Phase 24 — Prototype V1 Android release candidate (source engineering complete; owner EAS build and physical-device QA pending)
 
 ## Implemented
 - Phase 0 product scope/architecture
@@ -28,9 +28,12 @@ Phase 23 — Prototype V1 UX/accessibility candidate (source polish and local au
 - Phase 21 Prototype V1 security hardening
 - Phase 22 Prototype V1 QA/correctness hardening candidate
 - Phase 23 Prototype V1 UX/accessibility polish candidate
+- Phase 24 Prototype V1 Android release engineering candidate
 
 ## Acceptance status
-- Phase 23 TypeScript, ESLint, unit tests (13/13), accessibility audit, and source preflight passed during implementation on 2026-08-29 UTC. The final clean security/Android/Web package run is recorded at handoff.
+- Phase 24 release identity, assets, EAS profiles, private-config boundary, and native Android generation are source-controlled. The final clean Phase 24 gate is recorded at handoff.
+- No signed EAS artifact is claimed: the implementation environment had no EAS login/token or Android SDK. Owner EAS build provenance and physical-device evidence remain required.
+- Phase 23 TypeScript, ESLint, unit tests (13/13), accessibility audit, and source preflight passed during implementation on 2026-08-29 UTC.
 - Phase 23 physical TalkBack/font-scale/device acceptance is not claimed complete.
 - Phase 21 migration/RLS verification, Edge Function deployment, Firebase/FCM setup, strict preflight, and the final two-Android-device acceptance test remain owner-environment checks.
 - Phase 20's physical acceptance gate was not claimed complete; Phase 21 proceeded only because the owner explicitly approved the next phase.
@@ -87,7 +90,7 @@ Phase 23 — Prototype V1 UX/accessibility candidate (source polish and local au
 - iOS client code is included, but iOS credentials/device testing remain part of the later iOS production phase.
 
 ## Git checkpoint
-Recommended: `feat: polish Phase 23 V1 UX and accessibility`
+Recommended: `build(android): prepare Phase 24 release candidate`
 
 - Phase 15 hotfix: Android notification channel no longer passes `sound: "default"` as a custom sound filename; system notification sound behavior is used instead.
 
@@ -258,12 +261,45 @@ Complete `docs/PHASE23_ACCEPTANCE.md` on the configured Android build; automatio
 does not claim TalkBack, large-font, permission-dialog, or physical-device
 acceptance.
 
-## Next task
-Complete `docs/PHASE23_ACCEPTANCE.md` with TalkBack, large-font, light/dark,
-keyboard, permission, recovery, and V1 regression evidence. Also complete the
-still-open `docs/PHASE22_ACCEPTANCE.md` two-phone gate. Fix only reproducible V1
-blockers.
+## Phase 24 implementation
+- Android identity is fixed at `com.prakashdash.pulsechat`, version `1.0.0`,
+  versionCode `24`, with source-controlled versioning.
+- PulseChat launcher, adaptive, monochrome, splash, notification, and favicon
+  assets replace the generic Expo artwork; reviewed hashes are locked.
+- EAS CLI 22.0.0 is an exact development dependency and is enforced by
+  `eas.json`.
+- Development and preview produce internal APKs; production produces a store
+  AAB. All profiles use owner-controlled remote signing credentials.
+- Release builds fail closed without private Firebase configuration and support
+  `GOOGLE_SERVICES_JSON` as an EAS secret file variable.
+- `.easignore` excludes local configuration, Firebase/service-account files,
+  signing material, dependency/native output, and prior build artifacts.
+- Release and native-prebuild audits verify identity, configuration, generated
+  Gradle/manifest/resources, private-config behavior, and reviewed asset bytes.
+- The release runbook and evidence sheet define the only valid signed-build,
+  clean-install, upgrade, notification, and two-phone acceptance route.
 
-After both gates, follow `docs/ROADMAP.md`: Phase 24 Android release engineering,
-Phase 25 Play Store internal beta readiness, and Phase 26 production
-hardening/observability.
+## Phase 24 migration
+`supabase/migrations/202608290018_phase24_rate_limit_ambiguity_fix.sql`
+
+This forward migration preserves the Phase 21 private limiter signature and
+privileges while removing the `actor_user_id` parameter/column ambiguity from
+its conflict-update path.
+
+## Phase 24 verification
+Run `npm ci` and `npm run qa:phase24` from the clean Phase 24 package. Apply the
+Phase 24 migration and run `supabase/phase24_verify.sql`. Restore owner private
+inputs and run `npm run release:gate:configured`, then create the
+signed preview APK with `npm run build:android:preview`. Complete
+`docs/PHASE24_ACCEPTANCE.md`; local automation does not claim EAS signing,
+installability, upgrade continuity, FCM delivery, or physical-device behavior.
+
+## Next task
+Apply and verify the Phase 24 limiter migration, synchronize the Windows system
+clock, refresh the Web session, and repeat queued/fresh message sends. Then
+create the signed preview APK and complete `docs/PHASE24_ACCEPTANCE.md` on two
+phones. The still-open Phase 22 and Phase 23 physical evidence can be collected
+during the same run but retains its own sign-off records.
+
+After Phase 24 acceptance, follow `docs/ROADMAP.md`: Phase 25 Play Store
+internal beta readiness, then Phase 26 production hardening/observability.
