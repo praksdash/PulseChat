@@ -39,11 +39,33 @@ export function PushNotificationBridge() {
   const badgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    handledResponseIds.current.clear();
+    setNotificationPreferences(DEFAULT_NOTIFICATION_PREFERENCES);
     if (!user?.id) return undefined;
-    void getMyNotificationPreferences().catch((error) => {
-      console.warn('Unable to load notification preferences:', error);
+
+    let active = true;
+    let initialPreferencesLoaded = false;
+    const unsubscribe = subscribeToNotificationPreferences((preferences) => {
+      // The settings service cache can still contain the previous account's
+      // value during a same-process account switch. Ignore cached emissions
+      // until this user's authoritative fetch completes.
+      if (active && initialPreferencesLoaded) setNotificationPreferences(preferences);
     });
-    return subscribeToNotificationPreferences(setNotificationPreferences);
+
+    void getMyNotificationPreferences()
+      .then((preferences) => {
+        if (!active) return;
+        initialPreferencesLoaded = true;
+        setNotificationPreferences(preferences);
+      })
+      .catch((error) => {
+        console.warn('Unable to load notification preferences:', error);
+      });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [user?.id]);
 
   const scheduleBadgeSync = useCallback(() => {

@@ -39,6 +39,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const signedUrlCacheOwnerRef = useRef<string | null>(null);
+  const profileRequestSequenceRef = useRef(0);
   const sessionUserId = session?.user.id;
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [sessionUserId]);
 
   const loadProfile = useCallback(async (userId: string) => {
+    const requestId = ++profileRequestSequenceRef.current;
     setIsProfileLoading(true);
     try {
       const { data, error } = await supabase
@@ -59,13 +61,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       if (error) {
         console.warn('Unable to load profile:', error.message);
-        setProfile(null);
+        if (requestId === profileRequestSequenceRef.current) setProfile(null);
         return;
       }
 
-      setProfile((data as Profile | null) ?? null);
+      if (requestId === profileRequestSequenceRef.current) {
+        setProfile((data as Profile | null) ?? null);
+      }
     } finally {
-      setIsProfileLoading(false);
+      if (requestId === profileRequestSequenceRef.current) setIsProfileLoading(false);
     }
   }, []);
 
@@ -129,9 +133,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!sessionUserId || !isSupabaseConfigured) {
+      profileRequestSequenceRef.current += 1;
       setProfile(null);
+      setIsProfileLoading(false);
       return;
     }
+    setProfile((current) => current?.id === sessionUserId ? current : null);
     void loadProfile(sessionUserId);
   }, [loadProfile, sessionUserId]);
 

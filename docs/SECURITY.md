@@ -150,3 +150,17 @@ Phase 21 hardens the existing Prototype V1 features without claiming secret-chat
 - `npm run audit:security` fails on high/critical production dependency advisories.
 - On 2026-08-28, the audit reported 0 high, 0 critical, and 11 moderate transitive findings through Expo CLI/config/xcode paths. The suggested force fix changes SDK-controlled Expo packages outside this SDK 57 dependency set and is rejected as a breaking/incompatible remediation. Recheck when an SDK 57-compatible upstream release is available.
 - Runtime secrets remain server-side. `google-services.json`, service-account files, local `.env` files, and signing keys are excluded from the package.
+
+## Phase 22 account-isolation checks
+
+- Delayed profile responses are request-sequenced and cannot replace the next
+  signed-in user's profile.
+- Cached notification preferences are ignored during account transition until
+  the current account's authoritative settings are loaded.
+- Conversation callbacks require the active authenticated-user/conversation
+  scope and reject rows projected for another conversation.
+- Concurrent first-time native auth writes share one encryption-key
+  initialization per storage key, avoiding an unreadable session/key pairing.
+- `npm run qa:preflight` validates that the private Firebase Android file matches
+  `com.prakashdash.pulsechat` and rejects placeholder or server-secret client
+  environment values without printing those values.

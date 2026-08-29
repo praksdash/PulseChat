@@ -68,3 +68,15 @@ Phase 20 must preserve:
 Automated local checks cover TypeScript, ESLint, coalescer concurrency semantics, and Android Metro export. Physical-device profiling should use a V1-sized dataset: 20+ chats, 100+ messages in one chat, a media-heavy chat, burst delivery, offline/reconnect, and account switching.
 
 Startup telemetry, API latency dashboards, crash reporting, push-receipt polling, and production alerts remain Phase 26 work.
+
+## Phase 22 correctness follow-up
+
+- Older-page, search-window, Realtime, outbox, and send callbacks now verify the
+  active user/conversation scope before changing the timeline.
+- Route changes reset loading/search/error state, so an ignored stale request
+  cannot leave the next chat with an old spinner or error.
+- The Chats tab applies only the newest unread-count response.
+- Search pagination is request-sequenced; an old query cannot append results to
+  the current query.
+- These guards preserve durable sends and retry idempotency. They limit only
+  stale UI application, not server persistence.

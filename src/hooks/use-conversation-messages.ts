@@ -320,6 +320,8 @@ export function useConversationMessages(
 
   const markRead = useCallback(async () => {
     if (!conversationId || !currentUserId || !isOnline || AppState.currentState !== 'active') return;
+    const requestKey = `${currentUserId}:${conversationId}`;
+    if (activeConversationKeyRef.current !== requestKey) return;
     try {
       await markConversationRead(conversationId);
     } catch (error) {
@@ -435,6 +437,10 @@ export function useConversationMessages(
       activeConversationKeyRef.current = conversationKey;
       setMessages([]);
       setHasMore(true);
+      setIsLoadingOlder(false);
+      setIsSearchWindow(false);
+      setLoadError(null);
+      setActionError(null);
       setRealtimeState('connecting');
     }
     void loadInitial();
@@ -442,10 +448,15 @@ export function useConversationMessages(
 
   useEffect(() => {
     if (!conversationId || !currentUserId) return undefined;
+    const requestKey = `${currentUserId}:${conversationId}`;
+    const isCurrentConversation = () => (
+      mountedRef.current && activeConversationKeyRef.current === requestKey
+    );
 
     return subscribeToConversationMessages({
       conversationId,
       onMessage: (message) => {
+        if (!isCurrentConversation() || message.conversation_id !== conversationId) return;
         setMessages((current) => mergeServerMessage(current, message, currentUserId));
         // INSERT broadcasts carry only the raw messages row. Fetch the
         // authorized projection so group chats receive sender identity, media,
@@ -454,17 +465,21 @@ export function useConversationMessages(
         if (message.sender_id !== currentUserId) void markRead();
       },
       onReceiptState: (event) => {
+        if (!isCurrentConversation()) return;
         setMessages((current) => applyReceiptCursor(current, event, currentUserId));
         void refreshLatest();
       },
       onMediaReady: (messageId) => {
+        if (!isCurrentConversation()) return;
         if (messageId) void refreshOne(messageId);
         else void refreshLatest();
       },
       onMessageChanged: (messageId) => {
+        if (!isCurrentConversation()) return;
         void refreshOne(messageId);
       },
       onStateChange: (state) => {
+        if (!isCurrentConversation()) return;
         setRealtimeState(state);
         if (state === 'connected') void refreshLatest();
       },
@@ -486,11 +501,17 @@ export function useConversationMessages(
       return false;
     }
 
+    const requestKey = `${currentUserId}:${conversationId}`;
+    const isCurrentConversation = () => (
+      mountedRef.current && activeConversationKeyRef.current === requestKey
+    );
+
     setIsInitialLoading(true);
     setLoadError(null);
     try {
       const windowRows = await getMessageWindow(messageId);
-      if (!mountedRef.current) return false;
+      if (!isCurrentConversation()) return false;
+      if (windowRows.some((row) => row.conversation_id !== conversationId)) return false;
       if (windowRows.length === 0) {
         setLoadError('This search result is no longer available.');
         return false;
@@ -503,10 +524,10 @@ export function useConversationMessages(
       return windowRows.some((row) => row.id === messageId);
     } catch (error) {
       console.warn('Unable to open message search result:', error);
-      if (mountedRef.current) setLoadError('Unable to open this search result right now.');
+      if (isCurrentConversation()) setLoadError('Unable to open this search result right now.');
       return false;
     } finally {
-      if (mountedRef.current) setIsInitialLoading(false);
+      if (isCurrentConversation()) setIsInitialLoading(false);
     }
   }, [conversationId, currentUserId, isOnline, markRead]);
 
@@ -521,6 +542,10 @@ export function useConversationMessages(
       return;
     }
 
+    const requestKey = `${currentUserId}:${conversationId}`;
+    const isCurrentConversation = () => (
+      mountedRef.current && activeConversationKeyRef.current === requestKey
+    );
     const oldestServerMessage = [...messages].reverse().find((message) => !message.isOptimistic);
     if (!oldestServerMessage) {
       setHasMore(false);
@@ -535,18 +560,21 @@ export function useConversationMessages(
     setIsLoadingOlder(true);
     try {
       const page = await listConversationMessages(conversationId, cursor);
-      if (!mountedRef.current) return;
+      if (!isCurrentConversation()) return;
+      if (page.some((row) => row.conversation_id !== conversationId)) return;
       setMessages((current) => mergeServerMessages(current, page, currentUserId));
       setHasMore(page.length >= MESSAGE_PAGE_SIZE);
     } catch (error) {
       console.warn('Unable to load older messages:', error);
     } finally {
-      if (mountedRef.current) setIsLoadingOlder(false);
+      if (isCurrentConversation()) setIsLoadingOlder(false);
     }
   }, [conversationId, currentUserId, hasMore, isLoadingOlder, isOnline, isSearchWindow, messages]);
 
   const sendPendingText = useCallback(async (pending: PendingTextOutboxMessage) => {
     if (!conversationId || !currentUserId || !isOnline) return;
+    const requestKey = `${pending.userId}:${pending.conversationId}`;
+    if (activeConversationKeyRef.current !== requestKey) return;
     if (sendingTextIdsRef.current.has(pending.clientMessageId)) return;
 
     sendingTextIdsRef.current.add(pending.clientMessageId);
@@ -558,22 +586,23 @@ export function useConversationMessages(
 
     try {
       const savedMessage = await sendTextMessage({
-        conversationId,
-        senderId: currentUserId,
+        conversationId: pending.conversationId,
+        senderId: pending.userId,
         clientMessageId: pending.clientMessageId,
         body: pending.body,
         replyToMessageId: pending.replyToMessageId,
       });
-      await removePendingTextMessage(currentUserId, pending.clientMessageId);
-      if (!mountedRef.current) return;
-      setMessages((current) => mergeServerMessage(current, savedMessage, currentUserId));
+      await removePendingTextMessage(pending.userId, pending.clientMessageId);
+      if (!mountedRef.current || activeConversationKeyRef.current !== requestKey) return;
+      if (savedMessage.conversation_id !== pending.conversationId) return;
+      setMessages((current) => mergeServerMessage(current, savedMessage, pending.userId));
       if (pending.replyToMessageId) void refreshOne(savedMessage.id);
     } catch (error) {
       console.warn('Unable to send queued message:', error);
-      await updatePendingTextFailure(currentUserId, pending.clientMessageId, getErrorText(error));
+      await updatePendingTextFailure(pending.userId, pending.clientMessageId, getErrorText(error));
       const retryLater = !isOnline || isRetryableNetworkError(error);
       if (retryLater) void checkConnectivity();
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || activeConversationKeyRef.current !== requestKey) return;
       setMessages((current) => current.map((message) => (
         message.client_message_id === pending.clientMessageId
           ? { ...message, localState: retryLater ? 'queued' as const : 'failed' as const }
@@ -586,8 +615,9 @@ export function useConversationMessages(
 
   const flushPendingText = useCallback(async () => {
     if (!conversationId || !currentUserId) return;
+    const requestKey = `${currentUserId}:${conversationId}`;
     const pending = await listPendingTextMessages(currentUserId, conversationId);
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || activeConversationKeyRef.current !== requestKey) return;
     setMessages((current) => mergePendingTextMessages(current, pending));
     if (!isOnline) return;
 
@@ -637,11 +667,12 @@ export function useConversationMessages(
 
     setMessages((current) => [optimistic, ...current].sort(compareNewestFirst));
 
+    const requestKey = `${currentUserId}:${conversationId}`;
     void enqueuePendingTextMessage(pending).then(() => {
       if (isOnline) void sendPendingText(pending);
     }).catch((error) => {
       console.warn('Unable to persist outgoing message:', error);
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || activeConversationKeyRef.current !== requestKey) return;
       setMessages((current) => current.map((message) => (
         message.client_message_id === clientMessageId
           ? { ...message, localState: 'failed' as const }
@@ -658,6 +689,8 @@ export function useConversationMessages(
     replyToMessageId?: string | null,
   ) => {
     if (!conversationId || !currentUserId) return;
+    const requestKey = `${currentUserId}:${conversationId}`;
+    if (activeConversationKeyRef.current !== requestKey) return;
     if (!isOnline) {
       setMessages((current) => current.map((message) => (
         message.client_message_id === clientMessageId
@@ -676,7 +709,7 @@ export function useConversationMessages(
       asset,
       replyToMessageId: replyToMessageId ?? null,
       onStage: (stage: Exclude<MediaSendStage, 'ready' | 'failed'>) => {
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || activeConversationKeyRef.current !== requestKey) return;
         setMessages((current) => current.map((message) => (
           message.client_message_id === clientMessageId
             ? { ...message, mediaSendStage: stage, localState: 'sending' as const }
@@ -685,14 +718,15 @@ export function useConversationMessages(
       },
     })
       .then((savedMessage) => {
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || activeConversationKeyRef.current !== requestKey) return;
+        if (savedMessage.conversation_id !== conversationId) return;
         setMessages((current) => mergeServerMessage(current, savedMessage, currentUserId));
       })
       .catch((error) => {
         console.warn('Unable to send image:', error);
         const retryLater = !isOnline || isRetryableNetworkError(error);
         if (retryLater) void checkConnectivity();
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || activeConversationKeyRef.current !== requestKey) return;
         setMessages((current) => current.map((message) => (
           message.client_message_id === clientMessageId
             ? {

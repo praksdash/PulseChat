@@ -58,7 +58,12 @@
     "audit:security": "npm audit --omit=dev --audit-level=high",
     "verify": "npm run typecheck && npm run lint && npm run test:unit && npm run secrets:check",
     "verify:security": "npm run verify && npm run audit:security",
-    "check:android": "expo export --platform android --output-dir dist-phase21-check"
+    "qa:preflight": "node scripts/phase22-preflight.mjs",
+    "qa:preflight:source": "node scripts/phase22-preflight.mjs --source-only",
+    "qa:automated": "npm run verify:security && npm run qa:preflight:source",
+    "check:android": "expo export --platform android --output-dir dist-phase22-android-check",
+    "check:web": "expo export --platform web --output-dir dist-phase22-web-check",
+    "qa:phase22": "npm run qa:automated && npm run check:android && npm run check:web"
   },
   "private": true
 }

@@ -179,13 +179,16 @@ export default function SearchScreen() {
 
   const loadMoreMessages = async () => {
     if (isLoadingMore || !hasMoreMessages || messages.length === 0) return;
+    const requestId = requestSequence.current;
+    const requestQuery = debouncedQuery;
     const last = messages[messages.length - 1];
     setIsLoadingMore(true);
     try {
-      const nextPage = await searchMyMessages(debouncedQuery, {
+      const nextPage = await searchMyMessages(requestQuery, {
         createdAt: last.created_at,
         id: last.message_id,
       });
+      if (requestId !== requestSequence.current) return;
       setMessages((current) => {
         const known = new Set(current.map((item) => item.message_id));
         return [...current, ...nextPage.filter((item) => !known.has(item.message_id))];

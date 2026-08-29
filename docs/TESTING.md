@@ -259,3 +259,25 @@ Do not mark Phase 20 accepted until the Prototype V1 two-device gate passes. Aut
 ### Combined Prototype V1 gate
 
 Repeat the Phase 20 two-device gate after Phase 21 deployment. Do not mark Phase 21 accepted until both the SQL verification and the real-device V1 flow pass.
+
+## Phase 22 end-to-end QA
+
+### Automated candidate gate
+
+1. Run `npm ci` from a clean extraction.
+2. Run `npm run qa:phase22`.
+3. Require TypeScript, ESLint, ten unit tests, secret scan, high/critical
+   dependency gate, source preflight, Android export, and Web export to pass.
+4. Add the private `.env` and `google-services.json`, then run
+   `npm run qa:preflight`; zero failures are allowed for connected device QA.
+
+### Physical acceptance
+
+Apply/verify Phase 21 and redeploy both changed Edge Functions before testing.
+Complete every environment, core V1, route-race, safety-regression, defect, and
+sign-off row in `docs/PHASE22_ACCEPTANCE.md` using the same build on two Android
+phones and two accounts.
+
+Do not mark Phase 22 accepted from local automation. Supabase deployment,
+Database Webhook/secrets, Firebase push, Android permissions, and real restart
+persistence require owner-environment evidence.

@@ -22,13 +22,30 @@ export const isSupabaseConfigured = Boolean(configuredUrl && configuredKey);
 // documented approach stores an AES-256 key in SecureStore and the encrypted
 // session payload in AsyncStorage.
 class LargeSecureStore {
-  private async getOrCreateEncryptionKey(storageKey: string) {
-    const existing = await SecureStore.getItemAsync(storageKey);
-    if (existing) return aesjs.utils.hex.toBytes(existing);
+  private readonly encryptionKeyPromises = new Map<string, Promise<Uint8Array>>();
 
-    const generated = crypto.getRandomValues(new Uint8Array(32));
-    await SecureStore.setItemAsync(storageKey, aesjs.utils.hex.fromBytes(generated));
-    return generated;
+  private async getOrCreateEncryptionKey(storageKey: string) {
+    const inFlight = this.encryptionKeyPromises.get(storageKey);
+    if (inFlight) return inFlight;
+
+    const operation = (async () => {
+      const existing = await SecureStore.getItemAsync(storageKey);
+      if (existing) return aesjs.utils.hex.toBytes(existing);
+
+      const generated = crypto.getRandomValues(new Uint8Array(32));
+      await SecureStore.setItemAsync(storageKey, aesjs.utils.hex.fromBytes(generated));
+      return generated;
+    })();
+
+    this.encryptionKeyPromises.set(storageKey, operation);
+    try {
+      return await operation;
+    } catch (error) {
+      if (this.encryptionKeyPromises.get(storageKey) === operation) {
+        this.encryptionKeyPromises.delete(storageKey);
+      }
+      throw error;
+    }
   }
 
   private async encrypt(storageKey: string, value: string) {
@@ -68,6 +85,7 @@ class LargeSecureStore {
   }
 
   async removeItem(key: string) {
+    this.encryptionKeyPromises.delete(key);
     await Promise.all([AsyncStorage.removeItem(key), SecureStore.deleteItemAsync(key)]);
   }
 

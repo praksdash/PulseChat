@@ -2,16 +2,11 @@
 
 ## Current
 
-Phase 21 — Security hardening. Source implementation and automated local checks are complete; Supabase deployment and physical-device acceptance remain.
+Phase 22 — End-to-end QA candidate. Source review, correctness fixes, and local
+automation are complete. Owner Supabase deployment and the signed two-phone
+acceptance sheet remain before Phase 22 can be accepted.
 
 ## Next phases
-
-### Phase 22 — End-to-end QA and bug fixes
-
-- Apply/verify the Phase 21 migration and Edge Functions.
-- Run the complete flow on two Android phones and two accounts.
-- Fix only reproducible V1 blockers/regressions.
-- Exit gate: direct/group text and images, receipts/unread, push, offline replay, restart persistence, block/privacy, and account controls all pass.
 
 ### Phase 23 — UI/UX and accessibility polish
 
@@ -44,4 +39,5 @@ Phase 21 — Security hardening. Source implementation and automated local check
 
 The following remain deliberately uncommitted and must not delay Prototype V1: iOS production release, desktop/multi-device synchronization, voice/video calls, secret-chat E2EE, audio/video/files, stories, bots, channels, broadcasts, and Telegram-scale infrastructure.
 
-Do not begin Phase 22 implementation until the Phase 21 owner-environment deployment is ready; Phase 22 itself owns the combined physical-device acceptance and resulting bug fixes.
+Do not begin Phase 23 until `docs/PHASE22_ACCEPTANCE.md` is completed and the
+Phase 22 exit gate passes. Automated exports alone do not satisfy that gate.

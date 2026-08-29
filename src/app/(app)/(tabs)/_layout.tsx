@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { AppIcon } from '@/components/ui';
 import { getMyTotalUnreadCount } from '@/services/conversation-service';
@@ -9,11 +9,13 @@ import { useAppTheme } from '@/theme';
 export default function TabsLayout() {
   const theme = useAppTheme();
   const [totalUnread, setTotalUnread] = useState(0);
+  const unreadRequestSequenceRef = useRef(0);
 
   const refreshUnread = useCallback(async () => {
+    const requestId = ++unreadRequestSequenceRef.current;
     try {
       const count = await getMyTotalUnreadCount();
-      setTotalUnread(count);
+      if (requestId === unreadRequestSequenceRef.current) setTotalUnread(count);
     } catch (error) {
       console.warn('Unable to load total unread count:', error);
     }
@@ -21,9 +23,13 @@ export default function TabsLayout() {
 
   useEffect(() => {
     void refreshUnread();
-    return subscribeToConversationActivity(() => {
+    const unsubscribe = subscribeToConversationActivity(() => {
       void refreshUnread();
     });
+    return () => {
+      unreadRequestSequenceRef.current += 1;
+      unsubscribe();
+    };
   }, [refreshUnread]);
 
   const badge = totalUnread > 0 ? (totalUnread > 99 ? '99+' : totalUnread) : undefined;

@@ -245,3 +245,17 @@ RLS / caller-bound RPC
 Native local state uses AES-256-GCM with the storage key as associated data, so ciphertext copied between cache/session keys or modified at rest is rejected. Legacy native AES-CTR values are read only for one-time migration. Browser message data is not persisted.
 
 Signed media URLs stay in process memory and are stripped from offline snapshots. PostgreSQL stores only durable private object paths. The official image client re-encodes JPEGs, Storage constrains recorded MIME/size, and the commit RPC verifies the actual object row before accepting attachment metadata.
+
+## Phase 22 QA/correctness architecture
+
+Every asynchronous conversation result is bound to `<authenticated user>:<conversation>`.
+Older pages, search windows, Realtime callbacks, queued-text flushes, image stage
+updates, and send results check that scope before mutating the active timeline.
+Server rows are also checked against the requested conversation. Navigation does
+not cancel a durable send, but a completed chat-A request cannot render in chat B.
+
+Unread and profile reads use monotonic request sequences so only the latest
+eligible response changes account-visible state. Notification preferences remain
+at safe defaults during an account switch until the current account's fetch
+completes. Native auth storage deduplicates first-time key initialization per
+storage key before writing an encrypted session.

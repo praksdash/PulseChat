@@ -1,7 +1,7 @@
 # PulseChat Project State
 
 ## Current phase
-Phase 21 — Prototype V1 security hardening (implementation and automated checks complete; backend/device acceptance pending)
+Phase 22 — Prototype V1 end-to-end QA candidate (source fixes and local automation complete; owner backend/two-phone acceptance pending)
 
 ## Implemented
 - Phase 0 product scope/architecture
@@ -26,10 +26,11 @@ Phase 21 — Prototype V1 security hardening (implementation and automated check
 - Phase 19 offline/error handling
 - Phase 20 Prototype V1 performance/correctness fixes
 - Phase 21 Prototype V1 security hardening
+- Phase 22 Prototype V1 QA/correctness hardening candidate
 
 ## Acceptance status
-- Local TypeScript, ESLint, unit tests (6/6), secret scan, high/critical dependency gate, Android export, and Web export passed on 2026-08-28 UTC.
-- Phase 21 migration/RLS verification, Edge Function deployment, Firebase/FCM setup, and the final two-Android-device acceptance test remain owner-environment checks.
+- Phase 22 TypeScript, ESLint, unit tests (10/10), and source preflight passed during implementation on 2026-08-28 UTC. The final clean security/Android/Web package run is recorded at handoff.
+- Phase 21 migration/RLS verification, Edge Function deployment, Firebase/FCM setup, strict preflight, and the final two-Android-device acceptance test remain owner-environment checks.
 - Phase 20's physical acceptance gate was not claimed complete; Phase 21 proceeded only because the owner explicitly approved the next phase.
 
 ## Phase 15 implementation
@@ -84,7 +85,7 @@ Phase 21 — Prototype V1 security hardening (implementation and automated check
 - iOS client code is included, but iOS credentials/device testing remain part of the later iOS production phase.
 
 ## Git checkpoint
-Recommended: `feat: harden Phase 21 Prototype V1 security`
+Recommended: `fix: harden Phase 22 Prototype V1 acceptance`
 
 - Phase 15 hotfix: Android notification channel no longer passes `sound: "default"` as a custom sound filename; system notification sound behavior is used instead.
 
@@ -206,7 +207,39 @@ Automated local verification completed with `npm run verify` and `npm run check:
 ## Phase 21 verification
 Run `npm run verify:security`, `npm run check:android`, a Web export, then apply the migration and run `supabase/phase21_verify.sql`. Redeploy `send-message-push` and `delete-account` before manual testing.
 
-## Next task
-Apply and verify Phase 21 in the owner Supabase project, redeploy both changed Edge Functions, then complete the combined Phase 20/21 two-device V1 acceptance test. Do not advance the roadmap until that gate passes.
+## Phase 22 implementation
+- Active user/conversation guards cover initial/latest/older/search message reads,
+  Realtime callbacks, queued-text flushes, text sends, image sends, and media
+  progress so a slow chat-A operation cannot update chat B.
+- Server page/send rows are checked against the requested conversation.
+- Route transitions reset conversation loading/search/error state.
+- Only the newest unread-count response can update the Chats tab badge.
+- Delayed profile responses cannot replace the current account's profile.
+- Previous-account notification settings are ignored until the new account's
+  authoritative preferences load.
+- Native auth encryption deduplicates first-time key initialization per storage
+  key.
+- Global-search pagination is bound to the initiating query sequence.
+- Strict/source-only preflight commands validate source files, app/EAS settings,
+  public Supabase client configuration, and Firebase package matching.
+- The unit suite contains ten tests and `npm run qa:phase22` runs the complete
+  local security, source, Android, and Web gate.
 
-After the owner-environment deployment is ready, follow `docs/ROADMAP.md`: Phase 22 end-to-end QA, Phase 23 UI/accessibility polish, Phase 24 Android release engineering, Phase 25 Play Store internal beta readiness, and Phase 26 production hardening/observability.
+## Phase 22 migration
+None. Phase 22 requires the existing Phase 21 migration to be applied and
+verified in the owner project.
+
+## Phase 22 verification
+Clean `npm ci` and `npm run qa:phase22` passed on 2026-08-28 UTC. Complete
+`docs/PHASE22_ACCEPTANCE.md` on the deployed backend and two Android phones;
+local automation does not mark the phase accepted.
+
+## Next task
+Apply and verify Phase 21 in the owner Supabase project, redeploy both changed
+Edge Functions, run the strict Phase 22 preflight, and complete
+`docs/PHASE22_ACCEPTANCE.md` on two Android phones. Fix only reproducible V1
+blockers. Do not begin Phase 23 until the Phase 22 gate passes.
+
+After acceptance, follow `docs/ROADMAP.md`: Phase 23 UI/accessibility polish,
+Phase 24 Android release engineering, Phase 25 Play Store internal beta
+readiness, and Phase 26 production hardening/observability.
