@@ -281,3 +281,44 @@ phones and two accounts.
 Do not mark Phase 22 accepted from local automation. Supabase deployment,
 Database Webhook/secrets, Firebase push, Android permissions, and real restart
 persistence require owner-environment evidence.
+
+## Phase 23 UX/accessibility tests
+
+### Automated gate
+
+1. Run `npm ci` from a clean Phase 23 package.
+2. Run `npm run qa:preflight`; the configured private Supabase/Firebase inputs
+   must pass with zero failures.
+3. Run `npm run qa:phase23`; TypeScript, ESLint, 13 unit tests, secret scanning,
+   the high/critical dependency gate, source preflight, accessibility audit,
+   Android export, and Web export must all pass.
+4. Run `npm run audit:accessibility` independently when changing theme tokens,
+   shared controls, modals, back navigation, or target sizes.
+
+### Android accessibility gate
+
+Use `docs/PHASE23_ACCEPTANCE.md` as the signed record.
+
+1. Test Login/Register, Chats/Search, direct/group Chat, group management,
+   Profile/Settings, and every V1 modal with TalkBack enabled before launch.
+2. Repeat the screen matrix in Light and Dark at normal and largest practical
+   Android Font/Display size. No primary action may clip, overlap, or disappear.
+3. Verify shared inputs announce labels/errors/password state, buttons announce
+   disabled/busy state, switches/radios/tabs announce checked/selected state,
+   and conversation/message rows announce meaningful context.
+4. Verify message actions are discoverable without sight, failed-send Retry is
+   reachable, and modal focus stays inside the open sheet/dialog.
+5. Open V1 routes from a notification/deep link or browser refresh and confirm
+   Back reaches Chats, Search/Profile, Settings, Privacy, or Login as documented.
+6. Exercise keyboard entry at large text for authentication, profile, search,
+   group creation/info, and chat composer. The focused field and submission
+   action must remain reachable.
+7. Deny notification, camera, and photo permission; go offline; and force
+   privacy/blocked-user load errors. Each state must be truthful and recoverable.
+8. Repeat the Phase 22 two-phone Prototype V1 path to ensure the polish did not
+   regress realtime text/images, receipts/unread, push routing, groups, offline
+   replay, or restart persistence.
+
+Do not mark Phase 23 accepted from static checks or exports. TalkBack spoken
+output, focus order, physical font/display sizing, OS dialogs, and device
+behavior require signed manual evidence.

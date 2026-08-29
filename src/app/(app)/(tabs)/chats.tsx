@@ -212,7 +212,7 @@ export default function ChatsScreen() {
     if (isLoading && conversations.length === 0) {
       return (
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ActivityIndicator accessibilityLabel="Loading conversations" accessibilityRole="progressbar" size="large" color={theme.colors.primary} />
           <AppText variant="caption" tone="secondary">Loading conversations…</AppText>
         </View>
       );
@@ -342,7 +342,7 @@ export default function ChatsScreen() {
       </View>
 
       {error && conversations.length > 0 ? (
-        <View style={[styles.inlineError, { backgroundColor: theme.colors.surfaceMuted }]}>
+        <View accessibilityLiveRegion="polite" accessibilityRole="alert" style={[styles.inlineError, { backgroundColor: theme.colors.surfaceMuted }]}> 
           <AppText variant="caption" tone={isShowingCached ? 'secondary' : 'danger'}>{error}</AppText>
         </View>
       ) : null}

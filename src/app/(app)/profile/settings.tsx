@@ -56,7 +56,7 @@ export default function SettingsScreen() {
 
         <SurfaceCard style={styles.aboutCard}>
           <AppText variant="captionStrong">PulseChat</AppText>
-          <AppText variant="caption" tone="secondary">Realtime messaging prototype · Phase 18 settings</AppText>
+          <AppText variant="caption" tone="secondary">Prototype V1 · Phase 23 UX and accessibility polish</AppText>
         </SurfaceCard>
       </ScrollView>
     </SafeAreaView>
@@ -66,7 +66,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   topBar: { minHeight: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 10 },
-  backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
+  backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
   content: { padding: 18, paddingBottom: 36, gap: 16 },
   card: { overflow: 'hidden' },
   aboutCard: { padding: 16, gap: 4 },

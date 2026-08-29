@@ -14,11 +14,16 @@ export function AuthLoadingScreen() {
           <AppIcon
             name={{ ios: 'bubble.left.and.bubble.right.fill', android: 'forum', web: 'forum' }}
             size={32}
-            color="#FFFFFF"
+            color={theme.colors.onPrimary}
           />
         </View>
         <AppText variant="heading">PulseChat</AppText>
-        <ActivityIndicator size="small" color={theme.colors.primary} />
+        <ActivityIndicator
+          accessibilityLabel="Restoring your secure session"
+          accessibilityRole="progressbar"
+          size="small"
+          color={theme.colors.primary}
+        />
         <AppText variant="caption" tone="secondary">Restoring your secure session…</AppText>
       </View>
     </SafeAreaView>

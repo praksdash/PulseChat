@@ -1,7 +1,7 @@
 # PulseChat Project State
 
 ## Current phase
-Phase 22 — Prototype V1 end-to-end QA candidate (source fixes and local automation complete; owner backend/two-phone acceptance pending)
+Phase 23 — Prototype V1 UX/accessibility candidate (source polish and local automation complete; owner TalkBack/font-scale QA pending)
 
 ## Implemented
 - Phase 0 product scope/architecture
@@ -27,9 +27,11 @@ Phase 22 — Prototype V1 end-to-end QA candidate (source fixes and local automa
 - Phase 20 Prototype V1 performance/correctness fixes
 - Phase 21 Prototype V1 security hardening
 - Phase 22 Prototype V1 QA/correctness hardening candidate
+- Phase 23 Prototype V1 UX/accessibility polish candidate
 
 ## Acceptance status
-- Phase 22 TypeScript, ESLint, unit tests (10/10), and source preflight passed during implementation on 2026-08-28 UTC. The final clean security/Android/Web package run is recorded at handoff.
+- Phase 23 TypeScript, ESLint, unit tests (13/13), accessibility audit, and source preflight passed during implementation on 2026-08-29 UTC. The final clean security/Android/Web package run is recorded at handoff.
+- Phase 23 physical TalkBack/font-scale/device acceptance is not claimed complete.
 - Phase 21 migration/RLS verification, Edge Function deployment, Firebase/FCM setup, strict preflight, and the final two-Android-device acceptance test remain owner-environment checks.
 - Phase 20's physical acceptance gate was not claimed complete; Phase 21 proceeded only because the owner explicitly approved the next phase.
 
@@ -85,7 +87,7 @@ Phase 22 — Prototype V1 end-to-end QA candidate (source fixes and local automa
 - iOS client code is included, but iOS credentials/device testing remain part of the later iOS production phase.
 
 ## Git checkpoint
-Recommended: `fix: harden Phase 22 Prototype V1 acceptance`
+Recommended: `feat: polish Phase 23 V1 UX and accessibility`
 
 - Phase 15 hotfix: Android notification channel no longer passes `sound: "default"` as a custom sound filename; system notification sound behavior is used instead.
 
@@ -234,12 +236,34 @@ Clean `npm ci` and `npm run qa:phase22` passed on 2026-08-28 UTC. Complete
 `docs/PHASE22_ACCEPTANCE.md` on the deployed backend and two Android phones;
 local automation does not mark the phase accepted.
 
-## Next task
-Apply and verify Phase 21 in the owner Supabase project, redeploy both changed
-Edge Functions, run the strict Phase 22 preflight, and complete
-`docs/PHASE22_ACCEPTANCE.md` on two Android phones. Fix only reproducible V1
-blockers. Do not begin Phase 23 until the Phase 22 gate passes.
+## Phase 23 implementation
+- Light/dark semantic foreground pairs meet the automated 4.5:1 contrast gate.
+- Shared text, fields, buttons, search, rows, settings switches, and progress/error
+  states expose names, hints, scaling, checked, disabled, and busy semantics.
+- Report/message-action modals use sibling backdrop controls and modal focus
+  isolation, avoiding nested interactive elements on Web.
+- Known back, close, filter, and reaction controls meet the 44-point minimum.
+- Every route using `router.back()` has a deterministic refresh/deep-link fallback.
+- V1 form/search/member flows adjust for and dismiss the keyboard consistently.
+- Privacy and blocked-user initial-load failures show explicit retry paths.
+- `npm run audit:accessibility` and three new tests protect the fixed source
+  invariants; `npm run qa:phase23` adds fresh Android and Web exports.
 
-After acceptance, follow `docs/ROADMAP.md`: Phase 23 UI/accessibility polish,
-Phase 24 Android release engineering, Phase 25 Play Store internal beta
-readiness, and Phase 26 production hardening/observability.
+## Phase 23 migration
+None.
+
+## Phase 23 verification
+Local TypeScript, ESLint, 13 unit tests, and the static accessibility audit pass.
+Complete `docs/PHASE23_ACCEPTANCE.md` on the configured Android build; automation
+does not claim TalkBack, large-font, permission-dialog, or physical-device
+acceptance.
+
+## Next task
+Complete `docs/PHASE23_ACCEPTANCE.md` with TalkBack, large-font, light/dark,
+keyboard, permission, recovery, and V1 regression evidence. Also complete the
+still-open `docs/PHASE22_ACCEPTANCE.md` two-phone gate. Fix only reproducible V1
+blockers.
+
+After both gates, follow `docs/ROADMAP.md`: Phase 24 Android release engineering,
+Phase 25 Play Store internal beta readiness, and Phase 26 production
+hardening/observability.

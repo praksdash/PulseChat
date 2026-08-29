@@ -29,11 +29,15 @@ const MAX_GROUP_MEMBERS = 100;
 function SelectedPerson({ user, onRemove }: { user: PublicUserProfile; onRemove: () => void }) {
   const theme = useAppTheme();
   return (
-    <Pressable onPress={onRemove} style={styles.selectedPerson} accessibilityRole="button">
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Remove ${user.display_name} from selected members`}
+      onPress={onRemove}
+      style={styles.selectedPerson}>
       <Avatar name={user.display_name} uri={getAvatarPublicUrl(user.avatar_path)} size={40} />
       <AppText variant="micro" numberOfLines={1} style={styles.selectedName}>{user.display_name}</AppText>
-      <View style={[styles.removeDot, { backgroundColor: theme.colors.textSecondary }]}>
-        <AppIcon name={{ ios: 'xmark', android: 'close', web: 'close' }} size={12} color="#FFFFFF" />
+      <View style={[styles.removeDot, { backgroundColor: theme.colors.primary }]}> 
+        <AppIcon name={{ ios: 'xmark', android: 'close', web: 'close' }} size={12} color={theme.colors.onPrimary} />
       </View>
     </Pressable>
   );
@@ -137,7 +141,11 @@ export default function NewGroupScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top', 'bottom']}>
       <View style={[styles.header, { borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.roundButton}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back to chats"
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/chats')}
+          style={styles.roundButton}>
           <AppIcon name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={24} color={theme.colors.primary} />
         </Pressable>
         <View style={styles.headerCopy}>
@@ -146,9 +154,13 @@ export default function NewGroupScreen() {
         </View>
       </View>
 
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+      <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <View style={styles.identityRow}>
-          <Pressable onPress={() => void chooseAvatar()} style={[styles.avatarButton, { backgroundColor: theme.colors.primarySoft }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={avatar ? 'Change group photo' : 'Add group photo'}
+            onPress={() => void chooseAvatar()}
+            style={[styles.avatarButton, { backgroundColor: theme.colors.primarySoft }]}> 
             {avatar ? (
               <Image source={{ uri: avatar.uri }} style={styles.avatarImage} />
             ) : (
@@ -191,7 +203,7 @@ export default function NewGroupScreen() {
 
         {isSearching ? (
           <View style={styles.searchState}>
-            <ActivityIndicator color={theme.colors.primary} />
+            <ActivityIndicator accessibilityLabel="Searching for members" accessibilityRole="progressbar" color={theme.colors.primary} />
             <AppText variant="caption" tone="secondary">Searching…</AppText>
           </View>
         ) : debouncedQuery.length < 2 ? (
@@ -213,7 +225,9 @@ export default function NewGroupScreen() {
               return (
                 <Pressable
                   key={item.id}
-                  accessibilityRole="button"
+                  accessibilityRole="checkbox"
+                  accessibilityLabel={`${item.display_name}${item.username ? `, @${item.username}` : ''}`}
+                  accessibilityState={{ checked }}
                   onPress={() => togglePerson(item)}
                   style={({ pressed }) => [
                     styles.personRow,
@@ -234,7 +248,7 @@ export default function NewGroupScreen() {
                         backgroundColor: checked ? theme.colors.primary : 'transparent',
                       },
                     ]}>
-                      {checked ? <AppIcon name={{ ios: 'checkmark', android: 'check', web: 'check' }} size={15} color="#FFFFFF" /> : null}
+                      {checked ? <AppIcon name={{ ios: 'checkmark', android: 'check', web: 'check' }} size={15} color={theme.colors.onPrimary} /> : null}
                     </View>
                   </View>
                 </Pressable>
@@ -243,7 +257,7 @@ export default function NewGroupScreen() {
           </View>
         )}
 
-        {error ? <AppText variant="caption" tone="danger">{error}</AppText> : null}
+        {error ? <AppText accessibilityLiveRegion="assertive" accessibilityRole="alert" variant="caption" tone="danger">{error}</AppText> : null}
         <AppButton
           label={isCreating ? 'Creating group…' : `Create group (${selectedPeople.length + 1})`}
           loading={isCreating}
@@ -259,7 +273,7 @@ export default function NewGroupScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   header: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, borderBottomWidth: StyleSheet.hairlineWidth },
-  roundButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  roundButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1 },
   content: { padding: 18, paddingBottom: 42, gap: 22 },
   identityRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },

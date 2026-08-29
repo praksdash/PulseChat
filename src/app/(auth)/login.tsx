@@ -38,7 +38,9 @@ export default function LoginScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView
+          automaticallyAdjustKeyboardInsets
           contentContainerStyle={styles.content}
+          keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <View style={styles.brand}>
@@ -46,7 +48,7 @@ export default function LoginScreen() {
               <AppIcon
                 name={{ ios: 'bubble.left.and.bubble.right.fill', android: 'forum', web: 'forum' }}
                 size={38}
-                color="#FFFFFF"
+                color={theme.colors.onPrimary}
               />
             </View>
             <AppText variant="hero">PulseChat</AppText>
@@ -64,7 +66,7 @@ export default function LoginScreen() {
             </View>
 
             {configurationError ? (
-              <View style={[styles.notice, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.warning }]}>
+              <View accessibilityLiveRegion="assertive" accessibilityRole="alert" style={[styles.notice, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.warning }]}> 
                 <AppIcon
                   name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }}
                   size={18}
@@ -75,7 +77,7 @@ export default function LoginScreen() {
             ) : null}
 
             {formError ? (
-              <View style={[styles.notice, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.danger }]}>
+              <View accessibilityLiveRegion="assertive" accessibilityRole="alert" style={[styles.notice, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.danger }]}> 
                 <AppIcon
                   name={{ ios: 'exclamationmark.circle.fill', android: 'error', web: 'error' }}
                   size={18}

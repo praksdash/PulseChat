@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton, AppIcon, AppText, SettingsRow, SurfaceCard } from '@/components/ui';
+import { AppButton, AppIcon, AppText, EmptyState, SettingsRow, SurfaceCard } from '@/components/ui';
 import { getMyPrivacySettings, listMyBlockedUsers, updateMyPrivacySettings } from '@/services/privacy-service';
 import { useAppTheme } from '@/theme';
 import type { PrivacySettings } from '@/types/privacy';
@@ -19,23 +19,36 @@ function PrivacyToggle({
   description,
   value,
   onValueChange,
+  disabled = false,
   last = false,
 }: {
   title: string;
   description: string;
   value: boolean;
   onValueChange: (value: boolean) => void;
+  disabled?: boolean;
   last?: boolean;
 }) {
   const theme = useAppTheme();
   return (
-    <View style={[styles.toggleRow, !last && { borderBottomColor: theme.colors.divider, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={title}
+      accessibilityHint={description}
+      accessibilityState={{ checked: value, disabled }}
+      disabled={disabled}
+      onPress={() => onValueChange(!value)}
+      style={({ pressed }) => [
+        styles.toggleRow,
+        !last && { borderBottomColor: theme.colors.divider, borderBottomWidth: StyleSheet.hairlineWidth },
+        pressed && { backgroundColor: theme.colors.surfaceMuted },
+      ]}>
       <View style={styles.toggleCopy}>
         <AppText variant="bodyStrong">{title}</AppText>
         <AppText variant="caption" tone="secondary">{description}</AppText>
       </View>
-      <Switch value={value} onValueChange={onValueChange} />
-    </View>
+      <Switch accessible={false} pointerEvents="none" disabled={disabled} value={value} onValueChange={onValueChange} />
+    </Pressable>
   );
 }
 
@@ -46,6 +59,7 @@ export default function PrivacyScreen() {
   const [blockedCount, setBlockedCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
@@ -60,7 +74,9 @@ export default function PrivacyScreen() {
       setSettings(nextSettings);
       setSavedSettings(nextSettings);
       setBlockedCount(blocked.length);
+      setHasLoaded(true);
     } catch (loadError) {
+      setHasLoaded(false);
       setError(loadError instanceof Error ? loadError.message : 'Unable to load privacy settings.');
     } finally {
       setIsLoading(false);
@@ -91,7 +107,7 @@ export default function PrivacyScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <View style={[styles.header, { borderBottomColor: theme.colors.divider }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Go back" hitSlop={10} onPress={() => router.back()} style={styles.backButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back to settings" hitSlop={10} onPress={() => router.canGoBack() ? router.back() : router.replace('/profile/settings')} style={styles.backButton}>
           <AppIcon name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={23} color={theme.colors.primary} />
         </Pressable>
         <View style={styles.headerCopy}>
@@ -103,8 +119,17 @@ export default function PrivacyScreen() {
 
       {isLoading ? (
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ActivityIndicator accessibilityLabel="Loading privacy controls" accessibilityRole="progressbar" size="large" color={theme.colors.primary} />
           <AppText variant="caption" tone="secondary">Loading privacy controls…</AppText>
+        </View>
+      ) : !hasLoaded ? (
+        <View style={styles.centerState}>
+          <EmptyState
+            icon={{ ios: 'exclamationmark.shield', android: 'privacy_tip', web: 'privacy_tip' }}
+            title="Privacy controls unavailable"
+            description={error ?? 'Unable to load your privacy settings.'}
+          />
+          <View style={styles.retryButton}><AppButton label="Try again" variant="secondary" onPress={() => void load()} /></View>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -115,18 +140,21 @@ export default function PrivacyScreen() {
                 title="Appear in people search"
                 description="When off, your profile is hidden from People search. Existing conversation members can still open your safe profile from a chat."
                 value={settings.discoverable_by_search}
+                disabled={isSaving}
                 onValueChange={(value) => setSettings((current) => ({ ...current, discoverable_by_search: value }))}
               />
               <PrivacyToggle
                 title="Allow new direct chats"
                 description="When off, existing direct chats continue to work, but new people cannot open a direct conversation with you."
                 value={settings.allow_new_direct_messages}
+                disabled={isSaving}
                 onValueChange={(value) => setSettings((current) => ({ ...current, allow_new_direct_messages: value }))}
               />
               <PrivacyToggle
                 title="Show online & last seen"
                 description="When off, other conversation members cannot subscribe to your activity status or read your last-seen time."
                 value={settings.show_activity_status}
+                disabled={isSaving}
                 onValueChange={(value) => setSettings((current) => ({ ...current, show_activity_status: value }))}
                 last
               />
@@ -134,8 +162,8 @@ export default function PrivacyScreen() {
           </View>
 
           <AppButton label="Save privacy settings" loading={isSaving} disabled={!isDirty} onPress={() => void save()} />
-          {savedMessage ? <AppText variant="caption" tone="secondary" style={styles.feedback}>{savedMessage}</AppText> : null}
-          {error ? <AppText variant="caption" tone="danger" style={styles.feedback}>{error}</AppText> : null}
+          {savedMessage ? <AppText accessibilityLiveRegion="polite" variant="caption" tone="secondary" style={styles.feedback}>{savedMessage}</AppText> : null}
+          {error ? <AppText accessibilityLiveRegion="assertive" accessibilityRole="alert" variant="caption" tone="danger" style={styles.feedback}>{error}</AppText> : null}
 
           <View style={styles.section}>
             <AppText variant="captionStrong" tone="secondary" style={styles.sectionTitle}>SAFETY</AppText>
@@ -175,6 +203,7 @@ const styles = StyleSheet.create({
   backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1, alignItems: 'center', gap: 1 },
   centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  retryButton: { width: '100%', maxWidth: 260, paddingHorizontal: 20 },
   content: { padding: 18, paddingBottom: 40, gap: 16 },
   section: { gap: 8 },
   sectionTitle: { paddingLeft: 4 },

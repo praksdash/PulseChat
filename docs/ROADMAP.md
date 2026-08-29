@@ -2,18 +2,12 @@
 
 ## Current
 
-Phase 22 — End-to-end QA candidate. Source review, correctness fixes, and local
-automation are complete. Owner Supabase deployment and the signed two-phone
-acceptance sheet remain before Phase 22 can be accepted.
+Phase 23 — UI/UX and accessibility candidate. Source polish and local automation
+are complete. Physical Android TalkBack/font-scale evidence remains before
+Phase 23 can be accepted. Phase 22's signed two-phone acceptance also remains
+open; Phase 23 proceeded because the owner explicitly requested the next phase.
 
 ## Next phases
-
-### Phase 23 — UI/UX and accessibility polish
-
-- Fix inconsistent loading, empty, error, keyboard, and permission states.
-- Verify screen-reader labels, touch targets, contrast, font scaling, and dark mode.
-- Polish V1 navigation and first-run/setup guidance without adding product scope.
-- Exit gate: no critical accessibility issue or confusing V1 dead end.
 
 ### Phase 24 — Android release engineering
 
@@ -39,5 +33,6 @@ acceptance sheet remain before Phase 22 can be accepted.
 
 The following remain deliberately uncommitted and must not delay Prototype V1: iOS production release, desktop/multi-device synchronization, voice/video calls, secret-chat E2EE, audio/video/files, stories, bots, channels, broadcasts, and Telegram-scale infrastructure.
 
-Do not begin Phase 23 until `docs/PHASE22_ACCEPTANCE.md` is completed and the
-Phase 22 exit gate passes. Automated exports alone do not satisfy that gate.
+Do not mark Phase 23 accepted until `docs/PHASE23_ACCEPTANCE.md` is signed.
+Phase 22 remains independently unaccepted until `docs/PHASE22_ACCEPTANCE.md` is
+completed; automated exports alone satisfy neither physical-device gate.

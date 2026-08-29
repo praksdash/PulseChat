@@ -206,7 +206,11 @@ export default function SearchScreen() {
     <View style={styles.sectionHeader}>
       <AppText variant="captionStrong" tone="secondary">{title.toUpperCase()}</AppText>
       {section === 'all' && count > 0 ? (
-        <Pressable accessibilityRole="button" onPress={() => setSection(target)} hitSlop={8}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`See all ${count} ${title.toLowerCase()} results`}
+          onPress={() => setSection(target)}
+          hitSlop={8}>
           <AppText variant="captionStrong" tone="primary">See all {count}</AppText>
         </Pressable>
       ) : (
@@ -231,7 +235,7 @@ export default function SearchScreen() {
     if (isSearching) {
       return (
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ActivityIndicator accessibilityLabel="Searching" accessibilityRole="progressbar" size="large" color={theme.colors.primary} />
           <AppText variant="caption" tone="secondary">Searching your PulseChat…</AppText>
         </View>
       );
@@ -274,11 +278,16 @@ export default function SearchScreen() {
 
     return (
       <ScrollView
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.resultsContent}>
         {error ? (
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${error} Retry search`}
+            accessibilityLiveRegion="polite"
             onPress={() => setRetryNonce((value) => value + 1)}
             style={[styles.partialError, { backgroundColor: theme.colors.surfaceMuted }]}>
             <AppText variant="micro" tone="danger">{error} Tap to retry.</AppText>
@@ -365,7 +374,9 @@ export default function SearchScreen() {
           return (
             <Pressable
               key={option.key}
-              accessibilityRole="button"
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`${option.label} search results`}
               onPress={() => setSection(option.key)}
               style={[
                 styles.segment,
@@ -386,8 +397,8 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   header: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 12, gap: 2 },
   searchWrap: { paddingHorizontal: 16, paddingBottom: 10 },
-  segmentWrap: { flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 12, gap: 7 },
-  segment: { flex: 1, minHeight: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  segmentWrap: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, paddingBottom: 12, gap: 7 },
+  segment: { flexGrow: 1, flexBasis: '22%', minWidth: 70, minHeight: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 8 },
   body: { flex: 1 },
   resultsContent: { paddingBottom: 32, gap: 12 },
   section: { borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },

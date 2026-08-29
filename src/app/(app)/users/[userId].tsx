@@ -146,7 +146,7 @@ export default function PublicUserProfileScreen() {
 
       {isLoading ? (
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ActivityIndicator accessibilityLabel="Loading profile" accessibilityRole="progressbar" size="large" color={theme.colors.primary} />
           <AppText variant="caption" tone="secondary">Loading profile…</AppText>
         </View>
       ) : error || !profile ? (
@@ -202,7 +202,7 @@ export default function PublicUserProfileScreen() {
               </View>
             </View>
             {reportSuccess ? <AppText variant="caption" tone="secondary" style={styles.centerText}>Report submitted privately for review.</AppText> : null}
-            {actionError ? <AppText variant="caption" tone="danger" style={styles.centerText}>{actionError}</AppText> : null}
+            {actionError ? <AppText accessibilityLiveRegion="assertive" accessibilityRole="alert" variant="caption" tone="danger" style={styles.centerText}>{actionError}</AppText> : null}
           </View>
 
           <SurfaceCard style={styles.card}>
@@ -244,7 +244,7 @@ export default function PublicUserProfileScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  header: { height: 56, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: 8 },
+  header: { minHeight: 56, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: 8, paddingVertical: 4 },
   backButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center' },
   headerSpacer: { width: 44 },

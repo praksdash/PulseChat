@@ -19,6 +19,10 @@ export function SettingsRow({ icon, title, subtitle, onPress, last = false }: Se
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityHint={subtitle ? `${subtitle}. Opens details.` : 'Opens details'}
+      accessibilityState={{ disabled: !onPress }}
+      disabled={!onPress}
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: theme.colors.surfaceMuted }]}>
       <View style={[styles.iconBox, { backgroundColor: theme.colors.primarySoft }]}>

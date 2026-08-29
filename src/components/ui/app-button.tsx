@@ -22,6 +22,8 @@ export function AppButton({
   icon,
   disabled,
   fullWidth = true,
+  accessibilityLabel,
+  accessibilityState,
   ...props
 }: AppButtonProps) {
   const theme = useAppTheme();
@@ -31,7 +33,7 @@ export function AppButton({
     primary: {
       background: theme.colors.primary,
       pressed: theme.colors.primaryPressed,
-      text: '#FFFFFF',
+      text: theme.colors.onPrimary,
       border: theme.colors.primary,
     },
     secondary: {
@@ -49,7 +51,7 @@ export function AppButton({
     danger: {
       background: theme.colors.danger,
       pressed: theme.colors.danger,
-      text: '#FFFFFF',
+      text: theme.colors.onDanger,
       border: theme.colors.danger,
     },
   }[variant];
@@ -57,6 +59,12 @@ export function AppButton({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{
+        ...accessibilityState,
+        disabled: isDisabled,
+        busy: loading,
+      }}
       disabled={isDisabled}
       {...props}
       style={({ pressed }) => [
@@ -69,7 +77,11 @@ export function AppButton({
         },
       ]}>
       {loading ? (
-        <ActivityIndicator color={palette.text} />
+        <ActivityIndicator
+          accessibilityLabel={`${label}, in progress`}
+          accessibilityRole="progressbar"
+          color={palette.text}
+        />
       ) : (
         <View style={styles.content}>
           {icon ? <AppIcon name={icon} size={18} color={palette.text} /> : null}

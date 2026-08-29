@@ -99,7 +99,7 @@ export default function AccountSettingsScreen() {
           />
         </SurfaceCard>
 
-        {error ? <AppText variant="caption" tone="danger">{error}</AppText> : null}
+        {error ? <AppText accessibilityLiveRegion="assertive" accessibilityRole="alert" variant="caption" tone="danger">{error}</AppText> : null}
       </ScrollView>
 
       <ConfirmActionModal
@@ -119,7 +119,7 @@ export default function AccountSettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   topBar: { minHeight: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 10 },
-  backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
+  backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
   content: { padding: 18, paddingBottom: 36, gap: 16 },
   card: { padding: 18, gap: 6 },
   dangerCard: { padding: 18, gap: 12, borderWidth: StyleSheet.hairlineWidth },

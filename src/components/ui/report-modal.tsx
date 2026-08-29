@@ -50,12 +50,17 @@ export function ReportModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={isSubmitting ? undefined : onClose}>
-      <Pressable
-        style={[styles.backdrop, { backgroundColor: theme.colors.overlay }]}
-        onPress={isSubmitting ? undefined : onClose}>
+      <View style={styles.backdrop}>
         <Pressable
-          onPress={(event) => event.stopPropagation()}
-          style={[styles.card, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.border }]}>
+          accessibilityRole="button"
+          accessibilityLabel="Close report form"
+          disabled={isSubmitting}
+          style={[styles.dismissLayer, { backgroundColor: theme.colors.overlay }]}
+          onPress={isSubmitting ? undefined : onClose}
+        />
+        <View
+          accessibilityViewIsModal
+          style={[styles.card, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.border }]}> 
           <View style={styles.heading}>
             <AppText variant="heading">Report {messageReport ? 'message' : 'user'}</AppText>
             <AppText variant="caption" tone="secondary">
@@ -72,7 +77,8 @@ export function ReportModal({
                 <Pressable
                   key={item.value}
                   accessibilityRole="radio"
-                  accessibilityState={{ selected }}
+                  accessibilityLabel={item.label}
+                  accessibilityState={{ checked: selected }}
                   onPress={() => setReason(item.value)}
                   style={[
                     styles.reasonRow,
@@ -98,13 +104,19 @@ export function ReportModal({
               onChangeText={setDetails}
               placeholder="Optional details"
               placeholderTextColor={theme.colors.textTertiary}
+              allowFontScaling
+              maxFontSizeMultiplier={2}
               style={[styles.input, theme.typography.body, { color: theme.colors.text }]}
               accessibilityLabel="Report details"
             />
             <AppText variant="micro" tone="tertiary" style={styles.counter}>{details.length}/1000</AppText>
           </View>
 
-          {error ? <AppText variant="caption" tone="danger">{error}</AppText> : null}
+          {error ? (
+            <AppText accessibilityLiveRegion="assertive" accessibilityRole="alert" variant="caption" tone="danger">
+              {error}
+            </AppText>
+          ) : null}
 
           <View style={styles.actions}>
             <View style={styles.actionCell}>
@@ -114,14 +126,15 @@ export function ReportModal({
               <AppButton label="Submit report" variant="danger" loading={isSubmitting} onPress={() => void submit()} />
             </View>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 18 },
+  dismissLayer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   card: { width: '100%', maxWidth: 480, maxHeight: '90%', borderWidth: StyleSheet.hairlineWidth, borderRadius: 22, padding: 18, gap: 15 },
   heading: { gap: 5 },
   reasonScroll: { maxHeight: 330 },

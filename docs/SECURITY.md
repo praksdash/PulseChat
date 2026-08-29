@@ -164,3 +164,16 @@ Phase 21 hardens the existing Prototype V1 features without claiming secret-chat
 - `npm run qa:preflight` validates that the private Firebase Android file matches
   `com.prakashdash.pulsechat` and rejects placeholder or server-secret client
   environment values without printing those values.
+
+## Phase 23 accessible security state
+
+- Authentication, privacy, notification, block/report, and account-deletion
+  failures are announced without exposing client secrets or internal server
+  error payloads.
+- Privacy controls are not editable after their authoritative initial load
+  fails; the user receives an explicit retry path instead of acting on defaults.
+- Blocked-user load failures are not presented as an authoritative empty list.
+- Safe deep-link back fallbacks stay within authenticated V1 routes and do not
+  bypass membership or notification-tap authorization checks.
+- Semantic foreground tokens replace hardcoded action text colors, preserving
+  readable warning/destructive states in both themes.

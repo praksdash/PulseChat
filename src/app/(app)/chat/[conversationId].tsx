@@ -621,7 +621,7 @@ export default function ConversationScreen() {
     if (isInitialLoading && messages.length === 0) {
       return (
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ActivityIndicator accessibilityLabel="Loading messages" accessibilityRole="progressbar" size="large" color={theme.colors.primary} />
           <AppText variant="caption" tone="secondary">Loading messages…</AppText>
         </View>
       );
@@ -679,7 +679,7 @@ export default function ConversationScreen() {
         }}
         ListFooterComponent={isLoadingOlder ? (
           <View style={styles.paginationLoader}>
-            <ActivityIndicator size="small" color={theme.colors.primary} />
+            <ActivityIndicator accessibilityLabel="Loading older messages" accessibilityRole="progressbar" size="small" color={theme.colors.primary} />
           </View>
         ) : null}
       />
@@ -719,7 +719,11 @@ export default function ConversationScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top', 'bottom']}>
       <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Back to chats" hitSlop={10} onPress={() => router.back()} style={styles.roundButton}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back to chats"
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/chats')}
+          style={styles.roundButton}>
           <AppIcon name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={24} color={theme.colors.primary} />
         </Pressable>
         <Avatar name={name} uri={avatarUri} size={38} online={canObservePeerActivity && peerPresence.online} />
@@ -742,13 +746,13 @@ export default function ConversationScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={isMuted ? 'Unmute this chat' : 'Mute this chat'}
-          accessibilityState={{ disabled: isUpdatingMute }}
+          accessibilityState={{ disabled: !summary || isUpdatingMute, busy: isUpdatingMute }}
           disabled={!summary || isUpdatingMute}
           hitSlop={10}
           onPress={() => void toggleConversationMute()}
           style={styles.roundButton}>
           {isUpdatingMute ? (
-            <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+            <ActivityIndicator accessibilityLabel="Updating mute setting" accessibilityRole="progressbar" size="small" color={theme.colors.textSecondary} />
           ) : (
             <AppIcon
               name={isMuted
@@ -760,7 +764,10 @@ export default function ConversationScreen() {
           )}
         </Pressable>
         <Pressable
+          accessibilityRole="button"
           accessibilityLabel={summary?.kind === 'group' ? 'Open group info' : 'Conversation options'}
+          accessibilityState={{ disabled: !summary }}
+          disabled={!summary}
           hitSlop={10}
           onPress={summary?.kind === 'group' && conversationId
             ? () => router.push({ pathname: '/groups/[conversationId]', params: { conversationId } })
@@ -774,7 +781,7 @@ export default function ConversationScreen() {
 
       {isLoadingSummary ? (
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ActivityIndicator accessibilityLabel="Opening conversation" accessibilityRole="progressbar" size="large" color={theme.colors.primary} />
           <AppText variant="caption" tone="secondary">Opening conversation…</AppText>
         </View>
       ) : summaryError || !summary ? (
@@ -799,7 +806,7 @@ export default function ConversationScreen() {
                 </AppText>
               </View>
               {summary?.peer_user_id ? (
-                <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/users/[userId]', params: { userId: summary.peer_user_id! } })} hitSlop={8}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Manage blocked user" onPress={() => router.push({ pathname: '/users/[userId]', params: { userId: summary.peer_user_id! } })} hitSlop={8}>
                   <AppText variant="captionStrong" tone="primary">Manage</AppText>
                 </Pressable>
               ) : null}
@@ -811,7 +818,7 @@ export default function ConversationScreen() {
                 <AppText variant="captionStrong" tone="primary">Search result</AppText>
                 <AppText variant="micro" tone="secondary">Showing messages around the match</AppText>
               </View>
-              <Pressable accessibilityRole="button" onPress={returnToLatest} hitSlop={8}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Return to latest messages" onPress={returnToLatest} hitSlop={8}>
                 <AppText variant="captionStrong" tone="primary">Back to latest</AppText>
               </Pressable>
             </View>
@@ -820,6 +827,9 @@ export default function ConversationScreen() {
 
           {(loadError && messages.length > 0) || mediaError || actionError || muteError ? (
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${actionError ?? mediaError ?? muteError ?? loadError}. Dismiss`}
+              accessibilityLiveRegion="assertive"
               onPress={() => {
                 setMediaError(null);
                 setMuteError(null);
@@ -872,6 +882,8 @@ export default function ConversationScreen() {
 
             <View style={[styles.inputShell, { backgroundColor: theme.colors.surfaceMuted }]}>
               <TextInput
+                allowFontScaling
+                maxFontSizeMultiplier={2}
                 multiline
                 value={draft}
                 onChangeText={(value) => {
@@ -884,6 +896,8 @@ export default function ConversationScreen() {
                 placeholderTextColor={theme.colors.textTertiary}
                 style={[styles.input, theme.typography.body, { color: theme.colors.text }]}
                 accessibilityLabel={editingMessage ? 'Edit message' : 'Message'}
+                accessibilityHint={directMessagingAvailable ? 'Enter message text' : 'Messaging is unavailable for this conversation'}
+                accessibilityState={{ disabled: !editingMessage && !directMessagingAvailable }}
               />
             </View>
 
@@ -904,7 +918,7 @@ export default function ConversationScreen() {
                   ? { ios: 'checkmark', android: 'check', web: 'check' }
                   : { ios: 'paperplane.fill', android: 'send', web: 'send' }}
                 size={21}
-                color={canSend ? '#FFFFFF' : theme.colors.textTertiary}
+                color={canSend ? theme.colors.onPrimary : theme.colors.textTertiary}
               />
             </Pressable>
           </View>
@@ -958,7 +972,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 9,
   },
-  roundButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  roundButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1 },
   subtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
@@ -995,7 +1009,7 @@ const styles = StyleSheet.create({
   },
   contextAccent: { width: 3, alignSelf: 'stretch', borderRadius: 2 },
   contextCopy: { flex: 1, gap: 1 },
-  contextClose: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  contextClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',

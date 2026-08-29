@@ -80,3 +80,14 @@ Startup telemetry, API latency dashboards, crash reporting, push-receipt polling
   the current query.
 - These guards preserve durable sends and retry idempotency. They limit only
   stale UI application, not server persistence.
+
+## Phase 23 rendering constraints
+
+- Device font scaling is supported up to 2× by shared text and input controls;
+  action containers use minimum heights/padding so text can expand.
+- Search filters may wrap instead of compressing labels below the 44-point
+  target on narrow or large-font layouts.
+- Enlarged reaction/back/close targets do not change network behavior or list
+  pagination boundaries.
+- Accessibility labels summarize existing row data and do not trigger extra
+  requests or introduce a second source of truth.

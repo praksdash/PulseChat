@@ -50,7 +50,7 @@ export default function RegisterScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView automaticallyAdjustKeyboardInsets contentContainerStyle={styles.content} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
             <View style={[styles.iconBox, { backgroundColor: theme.colors.primarySoft }]}>
               <AppIcon
@@ -67,7 +67,7 @@ export default function RegisterScreen() {
 
           <SurfaceCard style={styles.card}>
             {configurationError ? (
-              <View style={[styles.notice, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.warning }]}>
+              <View accessibilityLiveRegion="assertive" accessibilityRole="alert" style={[styles.notice, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.warning }]}> 
                 <AppIcon
                   name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }}
                   size={18}
@@ -78,13 +78,13 @@ export default function RegisterScreen() {
             ) : null}
 
             {formError ? (
-              <View style={[styles.notice, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.danger }]}>
+              <View accessibilityLiveRegion="assertive" accessibilityRole="alert" style={[styles.notice, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.danger }]}> 
                 <AppText variant="caption" tone="danger" style={styles.noticeText}>{formError}</AppText>
               </View>
             ) : null}
 
             {successMessage ? (
-              <View style={[styles.notice, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.success }]}>
+              <View accessibilityLiveRegion="polite" accessibilityRole="alert" style={[styles.notice, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.success }]}> 
                 <AppIcon
                   name={{ ios: 'checkmark.circle.fill', android: 'check_circle', web: 'check_circle' }}
                   size={18}
@@ -166,7 +166,7 @@ export default function RegisterScreen() {
             {successMessage ? (
               <AppButton label="Back to sign in" variant="secondary" onPress={() => router.replace('/login')} />
             ) : (
-              <AppButton label="Back to sign in" variant="ghost" disabled={isSubmitting} onPress={() => router.back()} />
+              <AppButton label="Back to sign in" variant="ghost" disabled={isSubmitting} onPress={() => router.canGoBack() ? router.back() : router.replace('/login')} />
             )}
           </SurfaceCard>
         </ScrollView>

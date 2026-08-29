@@ -57,7 +57,7 @@ function HighlightedSnippet({ text, query }: { text: string; query: string }) {
   const after = text.slice(index + normalizedQuery.length);
 
   return (
-    <Text numberOfLines={2} style={[theme.typography.caption, { color: theme.colors.textSecondary }]}>
+    <Text allowFontScaling maxFontSizeMultiplier={2} numberOfLines={2} style={[theme.typography.caption, { color: theme.colors.textSecondary }]}> 
       {before}
       <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>{match}</Text>
       {after}
@@ -72,7 +72,8 @@ export function MessageSearchRow({ result, query, onPress }: MessageSearchRowPro
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Message in ${result.conversationName}`}
+      accessibilityLabel={`${result.senderLabel} in ${result.conversationName}: ${mediaPrefix}${result.snippet}. ${formatResultTime(result.createdAt)}`}
+      accessibilityHint="Opens this message in its conversation"
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,

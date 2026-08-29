@@ -20,7 +20,8 @@ export function UserRow({ user, onPress }: UserRowProps) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`View ${user.display_name}'s profile`}
+      accessibilityLabel={`${user.display_name}, ${identity}${user.bio ? `, ${user.bio}` : ''}`}
+      accessibilityHint="Opens profile"
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,

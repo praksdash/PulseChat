@@ -78,7 +78,7 @@ export default function ProfileScreen() {
           </SurfaceCard>
         </View>
 
-        {signOutError ? <AppText variant="caption" tone="danger" style={styles.error}>{signOutError}</AppText> : null}
+        {signOutError ? <AppText accessibilityLiveRegion="assertive" accessibilityRole="alert" variant="caption" tone="danger" style={styles.error}>{signOutError}</AppText> : null}
 
         <AppButton
           label="Sign out"

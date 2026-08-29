@@ -22,6 +22,10 @@ export function AppTextField({
   passwordToggle = false,
   secureTextEntry,
   style,
+  accessibilityLabel,
+  accessibilityHint,
+  allowFontScaling = true,
+  maxFontSizeMultiplier = 2,
   ...props
 }: AppTextFieldProps) {
   const theme = useAppTheme();
@@ -47,6 +51,11 @@ export function AppTextField({
         {leftIcon ? <AppIcon name={leftIcon} size={20} color={theme.colors.textSecondary} /> : null}
         <TextInput
           {...props}
+          accessibilityLabel={accessibilityLabel ?? label ?? props.placeholder}
+          accessibilityHint={accessibilityHint ?? (error ? `Error: ${error}` : helperText)}
+          accessibilityState={{ disabled: props.editable === false }}
+          allowFontScaling={allowFontScaling}
+          maxFontSizeMultiplier={maxFontSizeMultiplier}
           secureTextEntry={shouldHidePassword}
           placeholderTextColor={theme.colors.textTertiary}
           selectionColor={theme.colors.primary}
@@ -68,6 +77,8 @@ export function AppTextField({
         {passwordToggle ? (
           <Pressable
             accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: passwordVisible }}
             hitSlop={10}
             onPress={() => setPasswordVisible((current) => !current)}>
             <AppIcon
@@ -83,7 +94,13 @@ export function AppTextField({
         ) : null}
       </View>
       {error ? (
-        <AppText variant="micro" tone="danger">{error}</AppText>
+        <AppText
+          accessibilityLiveRegion="assertive"
+          accessibilityRole="alert"
+          variant="micro"
+          tone="danger">
+          {error}
+        </AppText>
       ) : helperText ? (
         <AppText variant="micro" tone="tertiary">{helperText}</AppText>
       ) : null}

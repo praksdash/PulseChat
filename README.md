@@ -4,7 +4,7 @@ PulseChat is a Telegram-inspired messaging prototype built with React Native, Ex
 
 ## Current milestone
 
-Phase 22 — Prototype V1 end-to-end QA candidate. Source-level correctness fixes and repeatable automated/preflight gates are implemented; the linked Supabase deployment and physical two-Android-phone acceptance remain owner-environment work.
+Phase 23 — Prototype V1 UX/accessibility candidate. Source-level polish and repeatable accessibility/QA gates are implemented; physical TalkBack/font-scale testing and the Phase 22 two-Android-phone acceptance remain owner-environment work.
 
 ## Prototype V1 success scope
 
@@ -68,6 +68,16 @@ Existing reply/edit/delete/reaction, privacy, settings, search, typing, and pres
   export, and Web export; and
 - a two-phone evidence sheet defines the only valid physical acceptance path.
 
+## Phase 23 UX/accessibility polish
+
+- semantic action/text colors meet the automated 4.5:1 contrast gate in light and dark modes;
+- shared text, inputs, buttons, switches, search, and row components expose scaling, names, hints, and state;
+- dialogs avoid nested interactive web controls and isolate modal focus;
+- known small back/close/filter/reaction targets meet the 44-point minimum;
+- deep-linked routes have deterministic back fallbacks;
+- keyboard, progress, error, permission, privacy-load, and blocked-user recovery states are explicit; and
+- a static accessibility audit plus three tests prevent regressions in these V1 fixes.
+
 ## Local setup
 
 1. Install Node.js and npm supported by Expo SDK 57.
@@ -77,7 +87,7 @@ Existing reply/edit/delete/reaction, privacy, settings, search, typing, and pres
 5. For real Android push notifications, add your Firebase `google-services.json` at the project root and complete `PHASE15_SETUP.md`.
 6. Run `supabase/phase21_verify.sql`, and redeploy `send-message-push` plus `delete-account`.
 7. Run `npm run qa:preflight`; correct every failure before building for devices.
-8. Run `npm run qa:phase22`.
+8. Run `npm run qa:phase23`.
 9. Start with `npx expo start -c` or install the same EAS development/preview build on both test phones.
 
 ## Verification commands
@@ -86,10 +96,10 @@ Existing reply/edit/delete/reaction, privacy, settings, search, typing, and pres
 npm run verify
 npm run verify:security
 npm run qa:preflight
-npm run qa:phase22
-npm run check:android
+npm run audit:accessibility
+npm run qa:phase23
 ```
 
-`check:android` validates the JavaScript Android bundle. A real development/preview build plus two physical devices is still required to verify FCM delivery, background notifications, camera/gallery permissions, realtime receipts, and restart persistence.
+The Android export validates the JavaScript bundle. A real development/preview build plus physical devices is still required to verify TalkBack, font/display scaling, FCM delivery, background notifications, camera/gallery permissions, realtime receipts, and restart persistence.
 
-See `PHASE22_README.txt`, `docs/PHASE22_ACCEPTANCE.md`, `docs/PHASE22_QA_REPORT.md`, `docs/PROJECT_STATE.md`, `docs/ROADMAP.md`, and `docs/TESTING.md` for the exact handoff state.
+See `PHASE23_README.txt`, `docs/PHASE23_ACCESSIBILITY_REVIEW.md`, `docs/PHASE23_ACCEPTANCE.md`, `docs/PHASE22_ACCEPTANCE.md`, `docs/PROJECT_STATE.md`, `docs/ROADMAP.md`, and `docs/TESTING.md` for the exact handoff state.

@@ -53,9 +53,15 @@ export function MessageActionsModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={[styles.backdrop, { backgroundColor: theme.colors.overlay }]} onPress={onClose}>
+      <View style={styles.backdrop}>
         <Pressable
-          onPress={(event) => event.stopPropagation()}
+          accessibilityRole="button"
+          accessibilityLabel="Close message actions"
+          style={[styles.dismissLayer, { backgroundColor: theme.colors.overlay }]}
+          onPress={onClose}
+        />
+        <View
+          accessibilityViewIsModal
           style={[styles.sheet, { backgroundColor: theme.colors.surfaceRaised, borderColor: theme.colors.border }]}> 
           <View style={styles.reactions}>
             {SUPPORTED_REACTIONS.map((emoji) => (
@@ -78,8 +84,8 @@ export function MessageActionsModal({
           {canEdit ? action('Edit', { ios: 'pencil', android: 'edit', web: 'edit' }, onEdit) : null}
           {canDelete ? action('Delete for everyone', { ios: 'trash', android: 'delete', web: 'delete' }, onDelete, true) : null}
           {canReport ? action('Report message', { ios: 'exclamationmark.bubble', android: 'report', web: 'report' }, onReport, true) : null}
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -90,6 +96,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     padding: 14,
   },
+  dismissLayer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   sheet: {
     borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,

@@ -49,7 +49,7 @@ export default function BlockedUsersScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <View style={[styles.header, { borderBottomColor: theme.colors.divider }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Go back" hitSlop={10} onPress={() => router.back()} style={styles.backButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back to privacy settings" hitSlop={10} onPress={() => router.canGoBack() ? router.back() : router.replace('/profile/privacy')} style={styles.backButton}>
           <AppIcon name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={23} color={theme.colors.primary} />
         </Pressable>
         <View style={styles.headerCopy}>
@@ -60,7 +60,16 @@ export default function BlockedUsersScreen() {
       </View>
 
       {isLoading ? (
-        <View style={styles.centerState}><ActivityIndicator size="large" color={theme.colors.primary} /></View>
+        <View style={styles.centerState}><ActivityIndicator accessibilityLabel="Loading blocked users" accessibilityRole="progressbar" size="large" color={theme.colors.primary} /></View>
+      ) : error && users.length === 0 ? (
+        <View style={styles.centerState}>
+          <EmptyState
+            icon={{ ios: 'exclamationmark.triangle', android: 'warning', web: 'warning' }}
+            title="Blocked users unavailable"
+            description={error}
+          />
+          <View style={styles.retryButton}><AppButton label="Try again" variant="secondary" onPress={() => void load()} /></View>
+        </View>
       ) : users.length === 0 ? (
         <View style={styles.centerState}>
           <EmptyState
@@ -83,7 +92,7 @@ export default function BlockedUsersScreen() {
               </View>
             </SurfaceCard>
           ))}
-          {error ? <AppText variant="caption" tone="danger" style={styles.error}>{error}</AppText> : null}
+          {error ? <AppText accessibilityLiveRegion="assertive" accessibilityRole="alert" variant="caption" tone="danger" style={styles.error}>{error}</AppText> : null}
         </ScrollView>
       )}
 
@@ -106,6 +115,7 @@ const styles = StyleSheet.create({
   backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1, alignItems: 'center', gap: 1 },
   centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 22 },
+  retryButton: { width: '100%', maxWidth: 260, marginTop: 16 },
   content: { padding: 16, gap: 10, paddingBottom: 36 },
   userCard: { padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
   userCopy: { flex: 1, gap: 2 },

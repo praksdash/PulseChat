@@ -63,7 +63,11 @@
     "qa:automated": "npm run verify:security && npm run qa:preflight:source",
     "check:android": "expo export --platform android --output-dir dist-phase22-android-check",
     "check:web": "expo export --platform web --output-dir dist-phase22-web-check",
-    "qa:phase22": "npm run qa:automated && npm run check:android && npm run check:web"
+    "qa:phase22": "npm run qa:automated && npm run check:android && npm run check:web",
+    "audit:accessibility": "node scripts/phase23-accessibility-audit.mjs",
+    "check:android:phase23": "expo export --platform android --output-dir dist-phase23-android-check",
+    "check:web:phase23": "expo export --platform web --output-dir dist-phase23-web-check",
+    "qa:phase23": "npm run verify:security && npm run qa:preflight:source && npm run audit:accessibility && npm run check:android:phase23 && npm run check:web:phase23"
   },
   "private": true
 }

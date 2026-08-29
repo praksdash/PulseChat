@@ -15,11 +15,11 @@ export function EmptyState({ icon, title, description }: EmptyStateProps) {
   const theme = useAppTheme();
 
   return (
-    <View style={styles.container}>
+    <View accessible accessibilityLabel={`${title}. ${description}`} style={styles.container}>
       <View style={[styles.iconCircle, { backgroundColor: theme.colors.primarySoft }]}>
         <AppIcon name={icon} size={30} color={theme.colors.primary} />
       </View>
-      <AppText variant="heading" style={styles.center}>{title}</AppText>
+      <AppText accessibilityRole="header" variant="heading" style={styles.center}>{title}</AppText>
       <AppText tone="secondary" style={styles.center}>{description}</AppText>
     </View>
   );

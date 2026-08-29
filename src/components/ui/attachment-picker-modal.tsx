@@ -32,7 +32,9 @@ export function AttachmentPickerModal({
           style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.overlay }]}
           onPress={onClose}
         />
-        <View style={[styles.sheet, { backgroundColor: theme.colors.surfaceRaised }]}> 
+        <View
+          accessibilityViewIsModal
+          style={[styles.sheet, { backgroundColor: theme.colors.surfaceRaised }]}> 
           <View style={styles.handleRow}>
             <View style={[styles.handle, { backgroundColor: theme.colors.border }]} />
           </View>
@@ -43,6 +45,8 @@ export function AttachmentPickerModal({
 
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Choose from photos"
+            accessibilityHint="Opens the device photo picker"
             onPress={onChoosePhoto}
             style={({ pressed }) => [
               styles.action,
@@ -64,6 +68,8 @@ export function AttachmentPickerModal({
           {Platform.OS !== 'web' ? (
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Take photo"
+              accessibilityHint="Opens the device camera"
               onPress={onTakePhoto}
               style={({ pressed }) => [
                 styles.action,
@@ -118,7 +124,8 @@ const styles = StyleSheet.create({
   actionIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   actionCopy: { flex: 1, gap: 2 },
   cancel: {
-    height: 48,
+    minHeight: 48,
+    paddingVertical: 12,
     borderRadius: 15,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',

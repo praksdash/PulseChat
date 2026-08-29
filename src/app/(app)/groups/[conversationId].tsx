@@ -255,7 +255,7 @@ export default function GroupInfoScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
-        <View style={styles.centerState}><ActivityIndicator size="large" color={theme.colors.primary} /><AppText tone="secondary">Loading group…</AppText></View>
+        <View style={styles.centerState}><ActivityIndicator accessibilityLabel="Loading group" accessibilityRole="progressbar" size="large" color={theme.colors.primary} /><AppText tone="secondary">Loading group…</AppText></View>
       </SafeAreaView>
     );
   }
@@ -274,7 +274,11 @@ export default function GroupInfoScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top', 'bottom']}>
       <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
-        <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.roundButton}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back to chats"
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/chats')}
+          style={styles.roundButton}>
           <AppIcon name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={24} color={theme.colors.primary} />
         </Pressable>
         <View style={styles.headerCopy}>
@@ -283,13 +287,18 @@ export default function GroupInfoScreen() {
         </View>
       </View>
 
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+      <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <View style={styles.groupHero}>
-          <Pressable disabled={!canManage} onPress={() => void changeAvatar()}>
-            {avatarUri ? <Image source={{ uri: avatarUri }} style={styles.groupAvatar} /> : <Avatar name={summary.display_name} size={88} />}
+          <Pressable
+            accessibilityRole={canManage ? 'button' : 'image'}
+            accessibilityLabel={canManage ? 'Change group photo' : `${summary.display_name} group photo`}
+            accessibilityState={{ disabled: !canManage }}
+            disabled={!canManage}
+            onPress={() => void changeAvatar()}>
+            {avatarUri ? <Image accessible={false} source={{ uri: avatarUri }} style={styles.groupAvatar} /> : <Avatar name={summary.display_name} size={88} />}
             {canManage ? (
               <View style={[styles.cameraBadge, { backgroundColor: theme.colors.primary }]}>
-                <AppIcon name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }} size={15} color="#FFFFFF" />
+                <AppIcon name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }} size={15} color={theme.colors.onPrimary} />
               </View>
             ) : null}
           </Pressable>
@@ -312,15 +321,22 @@ export default function GroupInfoScreen() {
           <View style={styles.section}>
             <AppText variant="captionStrong" tone="secondary">ADD MEMBER</AppText>
             <SearchBar value={addQuery} onChangeText={setAddQuery} placeholder="Search people" autoCapitalize="none" autoCorrect={false} />
-            {isSearching ? <ActivityIndicator color={theme.colors.primary} /> : null}
+            {isSearching ? <ActivityIndicator accessibilityLabel="Searching for members" accessibilityRole="progressbar" color={theme.colors.primary} /> : null}
             {addResults.slice(0, 6).map((person) => (
-              <Pressable key={person.id} onPress={() => void addMember(person)} style={[styles.addRow, { borderBottomColor: theme.colors.divider }]}>
+              <Pressable
+                key={person.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Add ${person.display_name} to group`}
+                accessibilityState={{ busy: busyMemberId === person.id }}
+                disabled={busyMemberId !== null}
+                onPress={() => void addMember(person)}
+                style={[styles.addRow, { borderBottomColor: theme.colors.divider }]}> 
                 <Avatar name={person.display_name} uri={getAvatarPublicUrl(person.avatar_path)} size={42} />
                 <View style={styles.memberCopy}>
                   <AppText variant="bodyStrong">{person.display_name}</AppText>
                   <AppText variant="caption" tone="secondary">{person.username ? `@${person.username}` : 'PulseChat user'}</AppText>
                 </View>
-                {busyMemberId === person.id ? <ActivityIndicator color={theme.colors.primary} /> : <AppIcon name={{ ios: 'plus.circle.fill', android: 'person_add', web: 'person_add' }} size={24} color={theme.colors.primary} />}
+                {busyMemberId === person.id ? <ActivityIndicator accessible={false} color={theme.colors.primary} /> : <AppIcon name={{ ios: 'plus.circle.fill', android: 'person_add', web: 'person_add' }} size={24} color={theme.colors.primary} />}
               </Pressable>
             ))}
           </View>
@@ -344,35 +360,35 @@ export default function GroupInfoScreen() {
                   {(!member.is_self || canChangeRole || canRemove || canTransfer) ? (
                     <View style={styles.memberActions}>
                       {!member.is_self ? (
-                        <Pressable onPress={() => router.push({ pathname: '/users/[userId]', params: { userId: member.user_id } })}>
+                        <Pressable accessibilityRole="button" accessibilityLabel={`View ${member.display_name} profile`} onPress={() => router.push({ pathname: '/users/[userId]', params: { userId: member.user_id } })} style={styles.memberAction}>
                           <AppText variant="micro" tone="primary">View profile</AppText>
                         </Pressable>
                       ) : null}
                       {canChangeRole ? (
-                        <Pressable disabled={busyMemberId === member.user_id} onPress={() => void changeRole(member)}>
+                        <Pressable accessibilityRole="button" accessibilityLabel={`${member.role === 'admin' ? 'Remove admin role from' : 'Make admin'} ${member.display_name}`} accessibilityState={{ disabled: busyMemberId === member.user_id }} disabled={busyMemberId === member.user_id} onPress={() => void changeRole(member)} style={styles.memberAction}>
                           <AppText variant="micro" tone="primary">{member.role === 'admin' ? 'Remove admin' : 'Make admin'}</AppText>
                         </Pressable>
                       ) : null}
                       {canTransfer ? (
-                        <Pressable disabled={busyMemberId === member.user_id} onPress={() => transferOwner(member)}>
+                        <Pressable accessibilityRole="button" accessibilityLabel={`Make ${member.display_name} group owner`} accessibilityState={{ disabled: busyMemberId === member.user_id }} disabled={busyMemberId === member.user_id} onPress={() => transferOwner(member)} style={styles.memberAction}>
                           <AppText variant="micro" tone="primary">Make owner</AppText>
                         </Pressable>
                       ) : null}
                       {canRemove ? (
-                        <Pressable disabled={busyMemberId === member.user_id} onPress={() => removeMember(member)}>
+                        <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${member.display_name} from group`} accessibilityState={{ disabled: busyMemberId === member.user_id }} disabled={busyMemberId === member.user_id} onPress={() => removeMember(member)} style={styles.memberAction}>
                           <AppText variant="micro" tone="danger">Remove</AppText>
                         </Pressable>
                       ) : null}
                     </View>
                   ) : null}
                 </View>
-                {busyMemberId === member.user_id ? <ActivityIndicator color={theme.colors.primary} /> : null}
+                {busyMemberId === member.user_id ? <ActivityIndicator accessibilityLabel={`Updating ${member.display_name}`} accessibilityRole="progressbar" color={theme.colors.primary} /> : null}
               </View>
             );
           })}
         </View>
 
-        {error ? <AppText variant="caption" tone="danger">{error}</AppText> : null}
+        {error ? <AppText accessibilityLiveRegion="assertive" accessibilityRole="alert" variant="caption" tone="danger">{error}</AppText> : null}
 
         {isOwner ? (
           <AppText variant="caption" tone="secondary">Transfer ownership to another member before leaving this group.</AppText>
@@ -387,7 +403,7 @@ export default function GroupInfoScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   header: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, borderBottomWidth: StyleSheet.hairlineWidth },
-  roundButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  roundButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1 },
   content: { padding: 18, paddingBottom: 46, gap: 24 },
   centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 18 },
@@ -404,4 +420,5 @@ const styles = StyleSheet.create({
   memberName: { flex: 1 },
   roleBadge: { borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3 },
   memberActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, paddingTop: 4 },
+  memberAction: { minHeight: 44, justifyContent: 'center' },
 });

@@ -244,6 +244,19 @@ RLS / caller-bound RPC
 
 Native local state uses AES-256-GCM with the storage key as associated data, so ciphertext copied between cache/session keys or modified at rest is rejected. Legacy native AES-CTR values are read only for one-time migration. Browser message data is not persisted.
 
+## Phase 23 accessible UI boundary
+
+Shared `AppText`, `AppButton`, `AppTextField`, `SearchBar`, settings rows, and
+result rows own the default accessibility contract: scalable text, accessible
+names/hints, semantic checked/selected/disabled/busy state, and 44-point primary
+targets. Screens add domain context and recovery destinations.
+
+Modal backdrops are siblings of their dialog content. This preserves valid Web
+DOM structure and prevents a dismiss button from wrapping other buttons. Route
+backs use navigator history when present and an explicit authenticated fallback
+after refresh/deep-link entry. These are UI guarantees only; PostgreSQL/RLS and
+the existing notification membership re-check remain the authorization boundary.
+
 Signed media URLs stay in process memory and are stripped from offline snapshots. PostgreSQL stores only durable private object paths. The official image client re-encodes JPEGs, Storage constrains recorded MIME/size, and the commit RPC verifies the actual object row before accepting attachment metadata.
 
 ## Phase 22 QA/correctness architecture

@@ -24,10 +24,17 @@ type ChatRowProps = {
 
 function ChatRowComponent({ chat, onPress }: ChatRowProps) {
   const theme = useAppTheme();
+  const unreadLabel = chat.unread ? `${chat.unread > 99 ? 'more than 99' : chat.unread} unread` : 'No unread messages';
+  const presenceLabel = chat.online ? 'Online' : 'Offline';
+  const muteLabel = chat.muted ? 'Muted' : '';
 
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={[chat.name, chat.sentByMe ? `You said ${chat.preview}` : chat.preview, chat.time, unreadLabel, presenceLabel, muteLabel]
+        .filter(Boolean)
+        .join('. ')}
+      accessibilityHint="Opens conversation"
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,

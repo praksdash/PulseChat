@@ -13,23 +13,24 @@ export function ConnectivityBanner() {
 
   return (
     <View
+      accessibilityLiveRegion="assertive"
       accessibilityRole="alert"
       style={[styles.container, { backgroundColor: theme.colors.warning }]}>
       <AppIcon
         name={{ ios: 'wifi.slash', android: 'wifi_off', web: 'wifi_off' }}
         size={16}
-        color="#FFFFFF"
+        color={theme.colors.onWarning}
       />
       <View style={styles.copy}>
-        <AppText variant="captionStrong" style={styles.text}>Offline</AppText>
-        <AppText variant="micro" style={styles.text}>Saved chats remain available. Text messages queue until connection returns.</AppText>
+        <AppText variant="captionStrong" style={{ color: theme.colors.onWarning }}>Offline</AppText>
+        <AppText variant="micro" style={{ color: theme.colors.onWarning }}>Saved chats remain available. Text messages queue until connection returns.</AppText>
       </View>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Check connection again"
         hitSlop={8}
         onPress={() => void checkNow()}>
-        <AppText variant="captionStrong" style={styles.text}>Retry</AppText>
+        <AppText variant="captionStrong" style={{ color: theme.colors.onWarning }}>Retry</AppText>
       </Pressable>
     </View>
   );
@@ -45,5 +46,4 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   copy: { flex: 1, gap: 1 },
-  text: { color: '#FFFFFF' },
 });

@@ -23,6 +23,8 @@ export function MessageReactionBar({ reactions = [], myReaction, onPress }: Mess
             key={reaction.emoji}
             accessibilityRole="button"
             accessibilityLabel={`${reaction.count} ${reaction.emoji} reactions`}
+            accessibilityHint={selected ? 'Removes your reaction' : 'Adds this reaction'}
+            accessibilityState={{ selected, disabled: !onPress }}
             disabled={!onPress}
             onPress={() => onPress?.(reaction.emoji)}
             style={({ pressed }) => [
@@ -51,8 +53,8 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   pill: {
-    minHeight: 28,
-    borderRadius: 14,
+    minHeight: 44,
+    borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 9,
     alignItems: 'center',

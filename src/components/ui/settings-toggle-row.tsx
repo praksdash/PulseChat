@@ -1,4 +1,4 @@
-import { StyleSheet, Switch, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { AppIcon } from './app-icon';
@@ -27,7 +27,18 @@ export function SettingsToggleRow({
   const theme = useAppTheme();
 
   return (
-    <View style={styles.row}>
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={title}
+      accessibilityHint={subtitle}
+      accessibilityState={{ checked: value, disabled }}
+      disabled={disabled}
+      onPress={() => onValueChange(!value)}
+      style={({ pressed }) => [
+        styles.row,
+        pressed && { backgroundColor: theme.colors.surfaceMuted },
+        disabled && styles.disabled,
+      ]}>
       <View style={[styles.iconBox, { backgroundColor: theme.colors.primarySoft }]}>
         <AppIcon name={icon} size={20} color={theme.colors.primary} />
       </View>
@@ -37,7 +48,8 @@ export function SettingsToggleRow({
           {subtitle ? <AppText variant="caption" tone="secondary">{subtitle}</AppText> : null}
         </View>
         <Switch
-          accessibilityLabel={title}
+          accessible={false}
+          pointerEvents="none"
           value={value}
           disabled={disabled}
           onValueChange={onValueChange}
@@ -45,7 +57,7 @@ export function SettingsToggleRow({
           thumbColor={value ? theme.colors.primary : theme.colors.textTertiary}
         />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -54,4 +66,5 @@ const styles = StyleSheet.create({
   iconBox: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 14 },
   copy: { flex: 1, gap: 2 },
+  disabled: { opacity: 0.55 },
 });

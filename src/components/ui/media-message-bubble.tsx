@@ -62,6 +62,7 @@ function MediaMessageBubbleComponent({
 }: MediaMessageBubbleProps) {
   const theme = useAppTheme();
   const preview = getPreviewSize(width, height);
+  const messageLabel = `${outgoing ? 'You sent' : 'Received'} a photo${caption ? `: ${caption}` : ''}. ${time}${edited ? '. Edited' : ''}${status ? `. ${status}` : ''}`;
 
   const stageLabel = mediaStage === 'preparing'
     ? 'Preparing photo…'
@@ -121,9 +122,11 @@ function MediaMessageBubbleComponent({
 
         <Pressable
           accessibilityRole={uri ? 'button' : undefined}
-          accessibilityLabel={uri ? 'Open photo' : 'Photo preview unavailable'}
+          accessibilityLabel={uri ? messageLabel : 'Photo preview unavailable'}
+          accessibilityHint={uri ? 'Double tap to open photo. Long press for message actions.' : undefined}
           disabled={!uri || !onOpen}
           onPress={onOpen}
+          onLongPress={onLongPress}
           style={[styles.imageShell, preview, { backgroundColor: theme.colors.surfaceMuted }]}> 
           {uri ? (
             <Image
@@ -142,7 +145,11 @@ function MediaMessageBubbleComponent({
           )}
 
           {stageLabel ? (
-            <View style={styles.progressOverlay}>
+            <View
+              accessibilityLiveRegion="polite"
+              accessibilityRole="progressbar"
+              accessibilityLabel={stageLabel}
+              style={styles.progressOverlay}>
               <ActivityIndicator size="small" color="#FFFFFF" />
               <AppText variant="micro" style={styles.progressText}>{stageLabel}</AppText>
             </View>

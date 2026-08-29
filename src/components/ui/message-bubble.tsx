@@ -40,6 +40,7 @@ function MessageBubbleComponent({
   onLongPress,
 }: MessageBubbleProps) {
   const theme = useAppTheme();
+  const messageLabel = `${outgoing ? 'You' : 'Received'}: ${text}. ${time}${edited ? '. Edited' : ''}${status ? `. ${status}` : ''}`;
 
   const statusContent = () => {
     if (!outgoing || !status) return null;
@@ -74,6 +75,10 @@ function MessageBubbleComponent({
   return (
     <View style={[styles.wrapper, outgoing ? styles.outgoing : styles.incoming]}>
       <Pressable
+        accessible={Boolean(onLongPress && status !== 'failed')}
+        accessibilityLabel={messageLabel}
+        accessibilityHint={onLongPress ? 'Double tap to open message actions' : undefined}
+        onAccessibilityTap={onLongPress}
         delayLongPress={350}
         onLongPress={onLongPress}
         style={({ pressed }) => [

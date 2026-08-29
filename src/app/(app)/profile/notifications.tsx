@@ -261,13 +261,13 @@ export default function NotificationSettingsScreen() {
         </SurfaceCard>
 
         {message ? (
-          <SurfaceCard style={[styles.feedbackCard, { borderColor: theme.colors.success }]}>
-            <AppText variant="caption" tone="success">{message}</AppText>
+          <SurfaceCard style={[styles.feedbackCard, { borderColor: theme.colors.success }]}> 
+            <AppText accessibilityLiveRegion="polite" variant="caption" tone="success">{message}</AppText>
           </SurfaceCard>
         ) : null}
         {error ? (
-          <SurfaceCard style={[styles.feedbackCard, { borderColor: theme.colors.danger }]}>
-            <AppText variant="caption" tone="danger">{error}</AppText>
+          <SurfaceCard style={[styles.feedbackCard, { borderColor: theme.colors.danger }]}> 
+            <AppText accessibilityLiveRegion="assertive" accessibilityRole="alert" variant="caption" tone="danger">{error}</AppText>
           </SurfaceCard>
         ) : null}
       </ScrollView>
@@ -278,7 +278,7 @@ export default function NotificationSettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   topBar: { minHeight: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 10 },
-  backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
+  backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
   titleArea: { gap: 1 },
   content: { padding: 18, paddingBottom: 36, gap: 14 },
   section: { gap: 8 },

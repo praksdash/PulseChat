@@ -19,7 +19,7 @@ export function MediaViewer({ visible, uri, caption, onClose }: MediaViewerProps
       transparent={false}
       animationType="fade"
       onRequestClose={onClose}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView accessibilityViewIsModal style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
@@ -40,6 +40,8 @@ export function MediaViewer({ visible, uri, caption, onClose }: MediaViewerProps
         <View style={styles.imageArea}>
           {uri ? (
             <Image
+              accessibilityLabel={caption ? `Photo. ${caption}` : 'Photo'}
+              accessible
               source={{ uri }}
               style={StyleSheet.absoluteFill}
               contentFit="contain"
@@ -61,14 +63,14 @@ export function MediaViewer({ visible, uri, caption, onClose }: MediaViewerProps
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#05080B' },
   header: {
-    height: 56,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
   },
-  closeButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  closeButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center', color: '#FFFFFF' },
-  headerSpacer: { width: 42 },
+  headerSpacer: { width: 44 },
   imageArea: { flex: 1 },
   captionArea: { paddingHorizontal: 18, paddingVertical: 14 },
   caption: { color: '#FFFFFF', textAlign: 'center' },

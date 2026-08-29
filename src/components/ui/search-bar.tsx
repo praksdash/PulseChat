@@ -3,7 +3,13 @@ import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import { AppIcon } from './app-icon';
 import { useAppTheme } from '@/theme';
 
-export function SearchBar({ style, ...props }: TextInputProps) {
+export function SearchBar({
+  style,
+  accessibilityLabel,
+  allowFontScaling = true,
+  maxFontSizeMultiplier = 2,
+  ...props
+}: TextInputProps) {
   const theme = useAppTheme();
 
   return (
@@ -15,6 +21,9 @@ export function SearchBar({ style, ...props }: TextInputProps) {
       />
       <TextInput
         {...props}
+        accessibilityLabel={accessibilityLabel ?? 'Search'}
+        allowFontScaling={allowFontScaling}
+        maxFontSizeMultiplier={maxFontSizeMultiplier}
         placeholderTextColor={theme.colors.textTertiary}
         selectionColor={theme.colors.primary}
         style={[

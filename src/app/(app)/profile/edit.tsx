@@ -172,7 +172,8 @@ export default function EditProfileScreen() {
       }
 
       await refreshProfile();
-      router.back();
+      if (router.canGoBack()) router.back();
+      else router.replace('/profile');
     } catch (error) {
       if (uploadedPath) await deleteAvatar(uploadedPath);
       const message = error instanceof Error ? error.message : 'Unable to save your profile.';
@@ -211,7 +212,7 @@ export default function EditProfileScreen() {
             accessibilityLabel="Back"
             accessibilityRole="button"
             hitSlop={12}
-            onPress={() => router.back()}
+            onPress={() => router.canGoBack() ? router.back() : router.replace('/profile')}
             style={styles.headerAction}>
             <AppIcon
               name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }}
@@ -224,6 +225,8 @@ export default function EditProfileScreen() {
         </View>
 
         <ScrollView
+          automaticallyAdjustKeyboardInsets
+          keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}>
@@ -295,7 +298,7 @@ export default function EditProfileScreen() {
 
           {formError ? (
             <SurfaceCard style={[styles.errorCard, { borderColor: theme.colors.danger }]}>
-              <AppText variant="caption" tone="danger">{formError}</AppText>
+              <AppText accessibilityLiveRegion="assertive" accessibilityRole="alert" variant="caption" tone="danger">{formError}</AppText>
             </SurfaceCard>
           ) : null}
 

@@ -10,7 +10,14 @@ type AppTextProps = TextProps & {
   tone?: TextTone;
 };
 
-export function AppText({ variant = 'body', tone = 'default', style, ...props }: AppTextProps) {
+export function AppText({
+  variant = 'body',
+  tone = 'default',
+  style,
+  allowFontScaling = true,
+  maxFontSizeMultiplier = 2,
+  ...props
+}: AppTextProps) {
   const theme = useAppTheme();
 
   const toneColor: Record<TextTone, string> = {
@@ -20,12 +27,14 @@ export function AppText({ variant = 'body', tone = 'default', style, ...props }:
     primary: theme.colors.primary,
     success: theme.colors.success,
     danger: theme.colors.danger,
-    inverse: '#FFFFFF',
+    inverse: theme.colors.onPrimary,
   };
 
   return (
     <Text
       {...props}
+      allowFontScaling={allowFontScaling}
+      maxFontSizeMultiplier={maxFontSizeMultiplier}
       style={[
         theme.typography[variant] as TextStyle,
         { color: toneColor[tone] },
