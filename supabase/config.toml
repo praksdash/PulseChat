@@ -15,3 +15,10 @@ verify_jwt = false
 # separately configured PUSH_RECEIPT_SECRET.
 [functions.poll-push-receipts]
 verify_jwt = false
+
+# Phase 27.3: this function validates the bearer token with Supabase Auth and
+# performs its authorization query through the user's RLS-bound client. Gateway
+# verification stays disabled for publishable-key compatibility; unauthenticated
+# requests never reach token signing.
+[functions.issue-call-token]
+verify_jwt = false
