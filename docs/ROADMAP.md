@@ -14,13 +14,22 @@ but Phase 25 still requires the exact AAB, Play forms and controlled-beta proof.
 
 ## Next milestone
 
-No further Prototype V1 source phase is committed. Complete every open Phase
-22–26 owner acceptance row, resolve the internal-beta findings, and make a
-separate evidence-based decision before any wider Play rollout.
+Phase 27.1 is the only committed post-V1 micro-phase. It records the scope and
+provider decision for Android one-to-one calling without changing application
+code. Phase 26 remains the stable baseline, and Phase 27.2 must not start until
+the owner approves `docs/PHASE27_1_CALL_SCOPE.md`.
+
+No later Phase 27 micro-phase starts automatically. Complete and review each
+small objective independently, while continuing to track every open Phase
+22–26 owner acceptance row before any wider Play rollout.
 
 ## Post-V1 backlog
 
-The following remain deliberately uncommitted and must not delay Prototype V1: iOS production release, desktop/multi-device synchronization, voice/video calls, secret-chat E2EE, audio/video/files, stories, bots, channels, broadcasts, and Telegram-scale infrastructure.
+Except for the narrowly documented Android one-to-one calling decision in
+Phase 27.1, the following remain deliberately uncommitted and must not delay
+Prototype V1: iOS production release, desktop/multi-device synchronization,
+group calls, secret-chat E2EE, audio/video/files, stories, bots, channels,
+broadcasts, and Telegram-scale infrastructure.
 
 Do not mark Phase 24 accepted until `docs/PHASE24_ACCEPTANCE.md` is signed for a
 clean-source EAS preview APK. Phase 22 and Phase 23 remain independently
