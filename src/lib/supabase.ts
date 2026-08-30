@@ -4,10 +4,17 @@ import 'react-native-get-random-values';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import * as aesjs from 'aes-js';
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 import type { Database } from '@/types/database';
+import {
+  classifySupabaseRequest,
+  enqueueDiagnostic,
+  fingerprintDiagnostic,
+  shouldCaptureApiDiagnostic,
+} from '@/services/diagnostics-buffer';
 import {
   decryptAuthenticatedString,
   encryptAuthenticatedString,
@@ -146,6 +153,70 @@ class BrowserSessionStorage {
 const supabaseUrl = configuredUrl || 'https://placeholder.supabase.co';
 const supabasePublishableKey = configuredKey || 'sb_publishable_placeholder';
 
+const baseFetch = globalThis.fetch.bind(globalThis);
+const runtimeBuildProfile = Constants.expoConfig?.extra?.release?.buildProfile;
+const diagnosticRuntime = {
+  appVersion: Constants.expoConfig?.version?.slice(0, 32) || 'unknown',
+  buildProfile: typeof runtimeBuildProfile === 'string' && runtimeBuildProfile.trim()
+    ? runtimeBuildProfile.trim().slice(0, 32)
+    : 'local',
+};
+const instrumentedSupabaseFetch: typeof fetch = async (input, init) => {
+  const startedAt = Date.now();
+  const urlValue = typeof input === 'string'
+    ? input
+    : input instanceof URL
+      ? input.toString()
+      : input.url;
+  const requestMethod = init?.method
+    ?? (typeof input === 'object' && !(input instanceof URL) ? input.method : undefined);
+  const operation = classifySupabaseRequest(urlValue, requestMethod);
+
+  // Reporting diagnostics must not report itself and create a feedback loop.
+  if (operation === 'rpc.record_client_diagnostics') return baseFetch(input, init);
+
+  try {
+    const response = await baseFetch(input, init);
+    const durationMs = Date.now() - startedAt;
+    if (shouldCaptureApiDiagnostic(response.status, durationMs, Math.random())) {
+      enqueueDiagnostic({
+        event_type: 'api_latency',
+        operation,
+        platform: Platform.OS === 'android' || Platform.OS === 'ios' || Platform.OS === 'web'
+          ? Platform.OS
+          : 'unknown',
+        app_version: diagnosticRuntime.appVersion,
+        build_profile: diagnosticRuntime.buildProfile,
+        duration_ms: durationMs,
+        outcome: response.ok ? 'ok' : 'error',
+        status_code: response.status,
+        error_fingerprint: response.ok
+          ? null
+          : fingerprintDiagnostic(`${operation}|${response.status}`),
+        occurred_at: new Date().toISOString(),
+      });
+    }
+    return response;
+  } catch (error) {
+    const durationMs = Date.now() - startedAt;
+    enqueueDiagnostic({
+      event_type: 'api_latency',
+      operation,
+      platform: Platform.OS === 'android' || Platform.OS === 'ios' || Platform.OS === 'web'
+        ? Platform.OS
+        : 'unknown',
+      app_version: diagnosticRuntime.appVersion,
+      build_profile: diagnosticRuntime.buildProfile,
+      duration_ms: durationMs,
+      outcome: 'error',
+      status_code: null,
+      error_fingerprint: fingerprintDiagnostic(`${operation}|network`),
+      occurred_at: new Date().toISOString(),
+    });
+    throw error;
+  }
+};
+
 export const supabase = createClient<Database>(supabaseUrl, supabasePublishableKey, {
   auth: {
     storage: Platform.OS === 'web' ? new BrowserSessionStorage() : new LargeSecureStore(),
@@ -153,4 +224,5 @@ export const supabase = createClient<Database>(supabaseUrl, supabasePublishableK
     persistSession: true,
     detectSessionInUrl: false,
   },
+  global: { fetch: instrumentedSupabaseFetch },
 });

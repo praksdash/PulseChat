@@ -18,7 +18,8 @@ Status: **SOURCE ENGINEERING COMPLETE — OWNER PLAY/BETA EVIDENCE PENDING**
 - Data safety and content-rating working answers;
 - truthful store listing and beta release notes;
 - 512 × 512 Play icon and 1024 × 500 opaque feature graphic;
-- authentic phone-screenshot specification;
+- authentic phone-screenshot specification and two 1080 × 1920 candidate
+  screenshots with personal identity replaced by generic test data;
 - ignored owner contact/URL/app-access configuration boundary;
 - public-page renderer and source/configured Play readiness audits;
 - internal-track, pre-launch, beta, rollback and sign-off runbooks.
@@ -44,12 +45,11 @@ The audit continues to report 11 moderate transitive Expo CLI/config/xcode
 advisories. The available forced remediation is a breaking SDK change; there
 are no high/critical production findings.
 
-## Intentional source-only warnings
+## Intentional source-only warning
 
-1. Real developer/support contact plus hosted HTTPS URLs are owner inputs and
-   are not invented or committed.
-2. At least two phone screenshots must be captured from the exact signed
-   candidate; fabricated screenshots are not included.
+Real developer/support contact plus hosted HTTPS URLs are owner inputs and are
+not invented or committed. The included screenshots must still be compared to
+the exact signed candidate before Play submission.
 
 ## Unclaimed external evidence
 

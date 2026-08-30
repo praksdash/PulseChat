@@ -211,3 +211,35 @@ New/changed database boundaries:
 
 Migration: `supabase/migrations/202608280017_phase21_security_hardening.sql`  
 Verification: `supabase/phase21_verify.sql`
+
+## Phase 26 observability and recovery metadata
+
+### `public.client_diagnostics`
+
+Private 30-day metadata ledger for `crash`, `startup`, and sampled/slow/error
+`api_latency` events. It stores a sanitized operation, duration/status,
+platform/version/build profile, outcome and optional one-way error fingerprint.
+There is no column for message/profile content, URL/body, token or raw stack.
+Authenticated clients insert only through `record_client_diagnostics(jsonb)`
+and cannot select the table.
+
+### `public.push_delivery_log`
+
+The status lifecycle is now `claimed -> ticketed -> delivered` or `error`.
+Receipt-attempt, last-check and confirmed-delivery timestamps support the
+scheduled worker. A 30-day retention window bounds this operational ledger.
+
+### `public.operational_jobs` and `public.operational_alerts`
+
+Server-only tables record scheduled-job freshness/outcome and current evaluated
+alert state. They contain aggregate codes/counts, not app content, and have no
+normal client policies.
+
+### Private dashboards
+
+- `pulsechat_private.rate_limit_dashboard` aggregates recent limiter activity.
+- `pulsechat_private.storage_dashboard` aggregates object count/bytes for the
+  private `avatars` and `chat-media` buckets.
+
+Migration: `supabase/migrations/202608290019_phase26_observability.sql`  
+Verification: `supabase/phase26_verify.sql`

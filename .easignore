@@ -19,6 +19,7 @@ fcm-service-account*.json
 credentials.json
 release/play-store/owner-inputs.json
 *reviewer-credentials*
+release/operations/owner-inputs.json
 
 # Signing material must remain in EAS remote credentials, never source upload.
 *.jks

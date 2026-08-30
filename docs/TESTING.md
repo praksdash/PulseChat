@@ -406,8 +406,8 @@ install, upgrade, push, and two-phone physical evidence.
 3. Require TypeScript, ESLint, 22 unit tests, secret scanning, the high/critical
    runtime dependency gate, source preflight, accessibility/release/native
    audits, Phase 25 Play source audit, and Android/Web exports to pass.
-4. The source Play audit may warn only that owner inputs and authentic phone
-   screenshots are still required; it must report zero failures.
+4. The source Play audit may warn only that owner inputs are still required; it
+   must report zero failures and validate both authentic phone screenshots.
 
 ### Configured policy/listing gate
 
@@ -432,3 +432,35 @@ install, upgrade, push, and two-phone physical evidence.
 4. Run a controlled 5–20 adult tester beta and record blockers/retests.
 5. Complete `docs/PHASE25_ACCEPTANCE.md`. Source readiness or a successful AAB
    upload alone does not accept Phase 25.
+
+## Phase 26 production-hardening tests
+
+### Source gate
+
+1. Extract the Phase 26 package into a clean directory and run `npm ci`.
+2. Run `npm run qa:phase26`; require zero failures. The source-only operations
+   audit may warn only that owner monitoring/backup/restore evidence is absent.
+3. Add the ignored owner operations file only after the external work is real,
+   then run `npm run ops:audit`; zero failures are allowed.
+
+### Backend and observability gate
+
+1. Apply `202608290019_phase26_observability.sql`, run
+   `supabase/phase26_verify.sql`, redeploy `send-message-push`, and deploy the
+   separately secret-protected `poll-push-receipts` function.
+2. Schedule it every five minutes. Confirm two consecutive successful job rows
+   and verify a monitor alerts on non-2xx, 15-minute staleness and critical rows.
+3. Exercise startup plus representative auth/chat/search/media/settings calls.
+   Confirm versioned metadata appears without names, messages, URLs, bodies,
+   tokens or raw stack traces.
+4. In a debug-only fault exercise, confirm the accessible recovery screen and
+   one grouped crash fingerprint. No crash trigger belongs in the release UI.
+5. Background phone B, send from phone A, and confirm the push row progresses
+   `claimed -> ticketed -> delivered`. Retire one controlled token and confirm
+   only that token is disabled after `DeviceNotRegistered`.
+6. Inspect private rate-limit and Storage dashboards and confirm normal app
+   accounts cannot query any operational table directly.
+7. Complete the isolated database plus private-Storage restore drill and one
+   critical-incident tabletop according to the Phase 26 runbooks.
+8. Repeat all open Phase 22–25 physical/signed/internal-beta checks on the exact
+   candidate and complete `docs/PHASE26_ACCEPTANCE.md`.

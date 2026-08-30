@@ -28,9 +28,13 @@ function requireMatch(filePath, pattern, message, failures) {
 
 try {
   fs.cpSync(projectRoot, tempProject, { recursive: true, filter: copyFilter });
-  fs.symlinkSync(path.join(projectRoot, 'node_modules'), path.join(tempProject, 'node_modules'), 'dir');
+  fs.symlinkSync(
+    path.join(projectRoot, 'node_modules'),
+    path.join(tempProject, 'node_modules'),
+    process.platform === 'win32' ? 'junction' : 'dir',
+  );
 
-  const expoBin = path.join(projectRoot, 'node_modules', '.bin', 'expo');
+  const expoCli = path.join(projectRoot, 'node_modules', 'expo', 'bin', 'cli');
   const environment = {
     ...process.env,
     EXPO_OFFLINE: process.env.EXPO_OFFLINE ?? '1',
@@ -39,12 +43,15 @@ try {
   };
   if (sourceOnly) delete environment.GOOGLE_SERVICES_JSON;
 
-  const prebuild = spawnSync(expoBin, ['prebuild', '--platform', 'android', '--no-install'], {
+  const prebuild = spawnSync(process.execPath, [expoCli, 'prebuild', '--platform', 'android', '--no-install'], {
     cwd: tempProject,
     env: environment,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+  if (prebuild.error) {
+    throw new Error(`Unable to start Expo Android prebuild: ${prebuild.error.message}`);
+  }
   if (prebuild.status !== 0) {
     process.stderr.write(prebuild.stdout ?? '');
     process.stderr.write(prebuild.stderr ?? '');
@@ -62,7 +69,8 @@ try {
 
   const resourceRoot = path.join(androidRoot, 'app', 'src', 'main', 'res');
   const notificationDrawables = fs.existsSync(resourceRoot)
-    ? fs.readdirSync(resourceRoot, { recursive: true }).map(String)
+    ? fs.readdirSync(resourceRoot, { recursive: true })
+      .map((name) => String(name).split(path.sep).join('/'))
     : [];
   if (!notificationDrawables.some((name) => /drawable-[^/]+\/notification_icon\.png$/.test(name))) {
     failures.push('Generated Android resources do not contain the configured notification icon.');

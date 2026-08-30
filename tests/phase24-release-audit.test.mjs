@@ -42,6 +42,17 @@ test('Phase 24 rate-limit migration removes the actor_user_id conflict target am
   assert.match(migration, /values\s*\(\s*\$1,/);
 });
 
+test('Phase 24 native smoke uses a permission-safe Windows junction', () => {
+  const nativeSmoke = fs.readFileSync(
+    path.join(projectRoot, 'scripts/phase24-native-smoke.mjs'),
+    'utf8',
+  );
+  assert.match(nativeSmoke, /process\.platform === 'win32' \? 'junction' : 'dir'/);
+  assert.match(nativeSmoke, /spawnSync\(process\.execPath, \[expoCli,/);
+  assert.match(nativeSmoke, /'node_modules', 'expo', 'bin', 'cli'/);
+  assert.match(nativeSmoke, /String\(name\)\.split\(path\.sep\)\.join\('\/'\)/);
+});
+
 test('Phase 24 identity validator rejects remote implicit versioning', () => {
   const baseline = {
     applicationId: 'com.prakashdash.pulsechat',

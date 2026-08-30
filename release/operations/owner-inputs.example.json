@@ -1,0 +1,11 @@
+{
+  "operationsOwner": "",
+  "alertChannel": "",
+  "receiptScheduleConfirmed": false,
+  "externalMonitorConfirmed": false,
+  "backupAutomationConfirmed": false,
+  "restoreDrillCompletedAt": "",
+  "restoreDrillEvidence": "",
+  "dependencyReviewOwner": "",
+  "nextDependencyReviewDate": ""
+}

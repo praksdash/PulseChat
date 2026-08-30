@@ -2,6 +2,8 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthLoadingScreen } from '@/components/auth';
+import { DiagnosticsBridge } from '@/components/auth/diagnostics-bridge';
+import { AppErrorBoundary } from '@/components/system/app-error-boundary';
 import { useAuth } from '@/hooks/use-auth';
 import { AuthProvider } from '@/providers/auth-provider';
 import { ConnectivityProvider } from '@/providers/connectivity-provider';
@@ -38,12 +40,15 @@ function RootNavigator() {
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <ConnectivityProvider>
-        <AuthProvider>
-          <RootNavigator />
-        </AuthProvider>
-      </ConnectivityProvider>
-    </ThemeProvider>
+    <AppErrorBoundary>
+      <ThemeProvider>
+        <ConnectivityProvider>
+          <AuthProvider>
+            <DiagnosticsBridge />
+            <RootNavigator />
+          </AuthProvider>
+        </ConnectivityProvider>
+      </ThemeProvider>
+    </AppErrorBoundary>
   );
 }

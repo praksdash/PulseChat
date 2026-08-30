@@ -1,8 +1,8 @@
 # PulseChat Project State
 
 ## Current phase
-Phase 25 — Play Store internal-beta readiness (source engineering complete;
-owner Play configuration, exact signed AAB, pre-launch and controlled-beta
+Phase 26 — Production hardening and observability (source engineering complete;
+owner backend deployment, live schedule/alerts, backup/restore drill and device
 evidence pending)
 
 ## Implemented
@@ -32,11 +32,15 @@ evidence pending)
 - Phase 23 Prototype V1 UX/accessibility polish candidate
 - Phase 24 Prototype V1 Android release engineering candidate
 - Phase 25 Prototype V1 Play Store internal-beta readiness candidate
+- Phase 26 Prototype V1 production hardening and observability candidate
 
 ## Acceptance status
-- Phase 25 policy/listing sources and automated readiness audit are complete.
-  Real support/public URLs, screenshots, Play forms/upload, pre-launch and beta
-  evidence remain owner-side requirements.
+- Phase 26 source diagnostics, receipt polling, alert/dashboard, retention and
+  recovery controls are complete. Deployment, scheduling, external monitoring,
+  backup/restore and incident/device evidence remain owner-side requirements.
+- Phase 25 policy/listing sources, two authentic phone screenshots and automated
+  readiness audit are complete. Real support/public URLs, Play forms/upload,
+  pre-launch and beta evidence remain owner-side requirements.
 - Phase 24 release identity, assets, EAS profiles, private-config boundary, and native Android generation are source-controlled. The final clean Phase 24 gate is recorded at handoff.
 - No signed EAS artifact is claimed: the implementation environment had no EAS login/token or Android SDK. Owner EAS build provenance and physical-device evidence remain required.
 - Phase 23 TypeScript, ESLint, unit tests (13/13), accessibility audit, and source preflight passed during implementation on 2026-08-29 UTC.
@@ -306,8 +310,8 @@ installability, upgrade continuity, FCM delivery, or physical-device behavior.
   service providers, anonymized shared-history retention and no E2EE claim.
 - Adult internal-beta content-rating/UGC working answers.
 - Play-compliant listing copy, 512 px icon and 1024 × 500 opaque feature graphic.
-- Authentic signed-build screenshot capture specification; no fabricated app
-  screenshots are included.
+- Two authentic phone screenshots are included with personal identity replaced
+  by generic test data; the app UI itself remains the captured candidate UI.
 - Owner-only contact/URL/app-access configuration remains ignored from source.
 - Configured renderer produces public pages only after owner inputs validate.
 - Source/configured Play readiness audits validate identity, character limits,
@@ -318,14 +322,32 @@ installability, upgrade continuity, FCM delivery, or physical-device behavior.
 None.
 
 ## Phase 25 verification
-Run `npm ci` and `npm run qa:phase25`. Source-only readiness may report exactly
-the expected owner-input and authentic-screenshot warnings. Before submission,
-provide the ignored owner inputs/screenshots, run `npm run play:audit` and
+Run `npm ci` and `npm run qa:phase25`. Source-only readiness may report the
+expected owner-input warning. Before submission, provide the ignored owner
+inputs, run `npm run play:audit` and
 `npm run play:render-public`, host the pages, build the exact production AAB and
 complete `docs/PHASE25_ACCEPTANCE.md` in Play Console.
 
+## Phase 26 implementation
+- Bounded, authenticated crash/startup/API diagnostic ingestion that accepts no
+  message/profile content, URL/body, token or raw stack.
+- Root render-error recovery UI, global JS error capture attempt and sampled
+  slow/error Supabase request timing by sanitized operation.
+- Expo tickets are recorded as `ticketed`; a separate secret-protected worker
+  polls receipts, marks delivery, bounds retries and disables only invalid tokens.
+- Private job/alert ledgers and rate-limit/Storage aggregate dashboards.
+- Automated 30-day diagnostics/push retention, 90-day resolved-alert retention,
+  and explicit monitoring, backup/restore and incident runbooks.
+
+## Phase 26 migration and verification
+Migration: `supabase/migrations/202608290019_phase26_observability.sql`  
+Verification: `supabase/phase26_verify.sql`
+
+Run `npm ci` and `npm run qa:phase26`. Apply the migration, redeploy the push
+dispatcher, deploy/schedule the receipt worker, configure the external alert
+path, complete the isolated database/private-Storage restore drill, then finish
+`docs/PHASE26_ACCEPTANCE.md`.
+
 ## Next task
-Complete the still-open Phase 22–24 physical/signed-build evidence, configure
-the Phase 25 owner inputs and public pages, capture authentic screenshots, and
-upload the exact production AAB to Play internal testing. Phase 26 production
-hardening/observability follows after this beta-readiness package.
+Complete every still-open Phase 22–26 owner acceptance gate. No wider Play
+rollout is authorized by source completion alone.

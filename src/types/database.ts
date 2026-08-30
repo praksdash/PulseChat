@@ -369,10 +369,13 @@ export type Database = {
           message_id: string;
           user_id: string;
           expo_push_token: string;
-          status: 'claimed' | 'sent' | 'error';
+          status: 'claimed' | 'ticketed' | 'delivered' | 'error';
           ticket_id: string | null;
           error_code: string | null;
           error_message: string | null;
+          receipt_attempt_count: number;
+          last_receipt_check_at: string | null;
+          delivered_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -381,10 +384,13 @@ export type Database = {
           message_id: string;
           user_id: string;
           expo_push_token: string;
-          status?: 'claimed' | 'sent' | 'error';
+          status?: 'claimed' | 'ticketed' | 'delivered' | 'error';
           ticket_id?: string | null;
           error_code?: string | null;
           error_message?: string | null;
+          receipt_attempt_count?: number;
+          last_receipt_check_at?: string | null;
+          delivered_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -393,10 +399,13 @@ export type Database = {
           message_id?: string;
           user_id?: string;
           expo_push_token?: string;
-          status?: 'claimed' | 'sent' | 'error';
+          status?: 'claimed' | 'ticketed' | 'delivered' | 'error';
           ticket_id?: string | null;
           error_code?: string | null;
           error_message?: string | null;
+          receipt_attempt_count?: number;
+          last_receipt_check_at?: string | null;
+          delivered_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -450,6 +459,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      record_client_diagnostics: {
+        Args: { target_events: Json };
+        Returns: number;
+      };
       get_my_notification_preferences: {
         Args: Record<string, never>;
         Returns: Array<{

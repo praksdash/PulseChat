@@ -12,7 +12,7 @@ Included
 - Data safety and content-rating working answers;
 - English store listing copy and release notes;
 - reviewed 512 px icon and 1024 x 500 feature graphic;
-- phone-screenshot capture specification;
+- phone-screenshot capture specification and two authentic phone screenshots;
 - internal-track upload, pre-launch, beta, rollback, and sign-off runbooks;
 - an automated source/configured Play readiness audit.
 
@@ -27,8 +27,8 @@ Owner inputs required before Play Console submission
    release/play-store/owner-inputs.json.
 2. Fill the real support email, developer name, and public HTTPS URLs. The real
    file is ignored and must not contain reviewer passwords or service keys.
-3. Capture at least two authentic phone screenshots by following
-   release/play-store/assets/README.md.
+3. Review the two included authentic phone screenshots against the exact signed
+   candidate; replace them only if the released UI materially differs.
 4. Run:
      npm run play:audit
      npm run play:render-public

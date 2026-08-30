@@ -217,3 +217,24 @@ Phase 21 hardens the existing Prototype V1 features without claiming secret-chat
   bypass membership or notification-tap authorization checks.
 - Semantic foreground tokens replace hardcoded action text colors, preserving
   readable warning/destructive states in both themes.
+
+## Phase 26 diagnostics and operations security
+
+- `record_client_diagnostics(jsonb)` derives the user from `auth.uid()`, accepts
+  at most 20 validated metadata events per request, and is rate-limited.
+- Diagnostic rows contain event/operation categories, timing/status,
+  platform/version/profile and one-way fingerprints only. The schema cannot
+  accept messages, profile content, full URLs, request bodies, tokens or raw
+  stack traces.
+- Normal app roles have no direct read/write access to diagnostics, job, alert,
+  rate-limit or Storage-dashboard data. Operators use trusted server tooling.
+- Expo ticket acceptance is not treated as delivery. The receipt worker uses a
+  dedicated constant-time-compared secret and disables only tokens explicitly
+  rejected as `DeviceNotRegistered`.
+- `PUSH_RECEIPT_SECRET`, `PUSH_WEBHOOK_SECRET`, Expo access tokens and Supabase
+  server keys remain separate server-side secrets and never enter the app.
+- Client diagnostics and push delivery rows are purged after 30 days; resolved
+  alerts after 90 days. Account deletion nulls the diagnostic user reference.
+- Database backups and private Storage-object backups are separate recovery
+  requirements. Restore drills occur only in isolated projects with all push
+  Webhooks/Cron disabled.

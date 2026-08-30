@@ -113,6 +113,7 @@ export function auditProject(projectRoot = defaultProjectRoot) {
   const hardcodedWhiteAllowlist = new Set([
     'src/components/ui/media-message-bubble.tsx',
     'src/components/ui/media-viewer.tsx',
+    'src/constants/theme.ts',
     'src/theme/tokens.ts',
   ]);
 

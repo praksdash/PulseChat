@@ -159,3 +159,21 @@ All reconnect sends use the existing message insert API and existing server auth
 - `report_user_or_message(...)` now limits fresh submissions while keeping duplicate requests idempotent.
 - `claim_my_push_test()` is called by `send-message-push` before dispatching an authenticated diagnostic notification.
 - Fresh text/image message inserts share the private message-rate trigger; the client API and `client_message_id` contract are unchanged.
+
+## Phase 26 diagnostics RPC
+
+- `record_client_diagnostics(events)` accepts 1–20 authenticated metadata-only
+  events and returns the inserted count. The actor is always `auth.uid()`.
+- `evaluate_operational_alerts()` and `run_operational_maintenance()` are
+  service-role-only functions for scheduled operations; mobile clients cannot
+  execute them.
+
+## Phase 26 Edge Function
+
+- `poll-push-receipts` — scheduled POST-only worker protected by
+  `x-pulsechat-receipt-secret`. It checks aged Expo ticket IDs, records confirmed
+  delivery/error receipts, disables `DeviceNotRegistered` tokens, updates job
+  freshness, evaluates alerts and performs bounded retention maintenance.
+
+`send-message-push` now records an accepted Expo response as `ticketed` rather
+than `sent`; only the receipt worker can advance it to `delivered`.

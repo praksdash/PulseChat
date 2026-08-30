@@ -9,13 +9,20 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const platform = process.argv[2];
 const outputDirectory = process.argv[3];
 
-if (!['android', 'web'].includes(platform) || !/^dist-phase(?:24|25)-[a-z0-9-]+$/i.test(outputDirectory ?? '')) {
-  process.stderr.write('Usage: node scripts/phase24-expo-export.mjs <android|web> <dist-phase24-*|dist-phase25-* directory>\n');
+if (!['android', 'web'].includes(platform) || !/^dist-phase(?:24|25|26)-[a-z0-9-]+$/i.test(outputDirectory ?? '')) {
+  process.stderr.write('Usage: node scripts/phase24-expo-export.mjs <android|web> <dist-phase24-*|dist-phase25-*|dist-phase26-* directory>\n');
   process.exit(1);
 }
 
-const expoBin = path.join(projectRoot, 'node_modules', '.bin', 'expo');
-const result = spawnSync(expoBin, ['export', '--platform', platform, '--output-dir', outputDirectory], {
+const expoCli = path.join(projectRoot, 'node_modules', 'expo', 'bin', 'cli');
+const result = spawnSync(process.execPath, [
+  expoCli,
+  'export',
+  '--platform',
+  platform,
+  '--output-dir',
+  outputDirectory,
+], {
   cwd: projectRoot,
   env: {
     ...process.env,
@@ -25,5 +32,7 @@ const result = spawnSync(expoBin, ['export', '--platform', platform, '--output-d
   stdio: 'inherit',
 });
 
-if (result.error) throw result.error;
+if (result.error) {
+  throw new Error(`Unable to start Expo ${platform} export: ${result.error.message}`);
+}
 process.exit(result.status ?? 1);

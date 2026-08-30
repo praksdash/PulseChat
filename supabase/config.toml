@@ -9,3 +9,9 @@ verify_jwt = false
 # destructive operation, matching the Phase 15 manual-auth pattern.
 [functions.delete-account]
 verify_jwt = false
+
+# Phase 26: a scheduled server-to-server worker verifies Expo delivery receipts.
+# The function rejects requests unless x-pulsechat-receipt-secret matches the
+# separately configured PUSH_RECEIPT_SECRET.
+[functions.poll-push-receipts]
+verify_jwt = false

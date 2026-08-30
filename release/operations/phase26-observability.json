@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "phase": 26,
+  "scope": "prototype-v1-production-hardening",
+  "diagnostics": {
+    "retentionDays": 30,
+    "maximumClientBatch": 20,
+    "maximumBufferedEvents": 50,
+    "apiSampleRate": 0.1,
+    "slowApiThresholdMs": 1000,
+    "allowedEventTypes": ["crash", "startup", "api_latency"],
+    "prohibitedPayloads": [
+      "message_content",
+      "profile_content",
+      "request_url",
+      "request_body",
+      "authorization_token",
+      "raw_stack_trace"
+    ]
+  },
+  "pushReceipts": {
+    "worker": "poll-push-receipts",
+    "scheduleMinutes": 5,
+    "receiptReadyDelayMinutes": 15,
+    "maximumReceiptsPerRun": 1000,
+    "abandonAfterHours": 24,
+    "invalidTokenCode": "DeviceNotRegistered"
+  },
+  "alerts": {
+    "crashesIn15Minutes": 3,
+    "apiErrorPercentIn15Minutes": 10,
+    "apiMinimumSamples": 20,
+    "startupP95Milliseconds": 5000,
+    "pushErrorPercentIn30Minutes": 15,
+    "pushMinimumSamples": 10,
+    "staleReceiptCount": 10,
+    "receiptPollerStaleMinutes": 15,
+    "storageBudgetBytes": 536870912
+  },
+  "retention": {
+    "pushDeliveryDays": 30,
+    "resolvedAlertDays": 90,
+    "rateLimitStateDays": 2
+  },
+  "ownerInputsPath": "release/operations/owner-inputs.json"
+}

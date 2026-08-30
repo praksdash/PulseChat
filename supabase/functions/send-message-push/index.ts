@@ -476,10 +476,13 @@ async function dispatchMessage(messageId: string) {
           message_id: message.id,
           user_id: claim.user_id,
           expo_push_token: claim.expo_push_token,
-          status: ok ? 'sent' : 'error',
+          status: ok ? 'ticketed' : 'error',
           ticket_id: ticket?.id ?? null,
           error_code: ticket?.details?.error ?? (ticket ? 'EXPO_TICKET_ERROR' : 'MISSING_TICKET'),
           error_message: ticket?.message?.slice(0, 500) ?? (ticket ? null : 'Expo Push Service returned no ticket.'),
+          receipt_attempt_count: 0,
+          last_receipt_check_at: null,
+          delivered_at: null,
           updated_at: new Date().toISOString(),
         };
       });
@@ -499,6 +502,9 @@ async function dispatchMessage(messageId: string) {
         ticket_id: null,
         error_code: 'PUSH_REQUEST_FAILED',
         error_message: errorMessage,
+        receipt_attempt_count: 0,
+        last_receipt_check_at: null,
+        delivered_at: null,
         updated_at: new Date().toISOString(),
       }));
       const { error: logError } = await admin

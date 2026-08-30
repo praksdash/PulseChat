@@ -49,5 +49,8 @@ fcm-service-account*.json
 release/play-store/owner-inputs.json
 *reviewer-credentials*
 
+# Operations contacts and external recovery/monitoring evidence
+release/operations/owner-inputs.json
+
 # Supabase CLI local state
 .supabase/

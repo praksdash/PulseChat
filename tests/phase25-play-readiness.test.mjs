@@ -15,8 +15,14 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 test('Phase 25 source Play readiness audit has no static failures', () => {
   const result = auditPlayReadiness(projectRoot, { sourceOnly: true });
   assert.deepEqual(result.failures, []);
-  assert.ok(result.warnings.some((warning) => warning.includes('screenshots')));
-  assert.ok(result.warnings.some((warning) => warning.includes('Owner Play')));
+  assert.equal(result.warnings.some((warning) => warning.includes('screenshots')), false);
+  const ownerInputsConfigured = fs.existsSync(
+    path.join(projectRoot, 'release/play-store/owner-inputs.json'),
+  );
+  assert.equal(
+    result.warnings.some((warning) => warning.includes('Owner Play')),
+    !ownerInputsConfigured,
+  );
 });
 
 test('Phase 25 listing validator enforces Play character limits', () => {
@@ -47,6 +53,8 @@ test('Phase 25 owner validator rejects placeholders and missing confirmations', 
 
 test('Phase 25 exports remain inside phase-scoped output directories', () => {
   const wrapper = fs.readFileSync(path.join(projectRoot, 'scripts/phase24-expo-export.mjs'), 'utf8');
-  assert.match(wrapper, /dist-phase\(\?:24\|25\)/);
+  assert.match(wrapper, /dist-phase\(\?:24\|25\|26\)/);
   assert.match(wrapper, /\^dist-phase/);
+  assert.match(wrapper, /spawnSync\(process\.execPath, \[/);
+  assert.match(wrapper, /'node_modules', 'expo', 'bin', 'cli'/);
 });
