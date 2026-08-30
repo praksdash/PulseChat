@@ -15,14 +15,15 @@ but Phase 25 still requires the exact AAB, Play forms and controlled-beta proof.
 ## Next milestone
 
 Phase 27.1 selected the narrow Android one-to-one call scope and LiveKit Cloud
-media provider. Phase 27.2 added the call-session/participant schema and RLS.
-Phase 27.3 is the current micro-phase: authenticated, RLS-authorized,
-short-lived LiveKit token issuance only. Phase 26 remains the stable application
+media provider. Phase 27.2 added the call-session/participant schema and RLS;
+Phase 27.3 added server-side token issuance. Phase 27.4 is the current
+micro-phase: pinned Android LiveKit native integration, permissions, and
+platform-safe runtime boundaries only. Phase 26 remains the stable application
 baseline.
 
-Phase 27.4 must not start until the owner configures the three private LiveKit
-secrets, deploys `issue-call-token`, and records its authentication and
-authorization checks in `docs/PHASE27_3_ACCEPTANCE.md`.
+Phase 27.5 must not start until a new EAS preview APK from the Phase 27.4
+revision installs/opens on Android without startup permission prompts or
+regressions in the existing messaging flows.
 
 No later Phase 27 micro-phase starts automatically. Complete and review each
 small objective independently, while continuing to track every open Phase

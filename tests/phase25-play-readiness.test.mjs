@@ -53,7 +53,7 @@ test('Phase 25 owner validator rejects placeholders and missing confirmations', 
 
 test('Phase 25 exports remain inside phase-scoped output directories', () => {
   const wrapper = fs.readFileSync(path.join(projectRoot, 'scripts/phase24-expo-export.mjs'), 'utf8');
-  assert.match(wrapper, /dist-phase\(\?:24\|25\|26\)/);
+  assert.match(wrapper, /dist-phase\(\?:24\|25\|26\|27-4\)/);
   assert.match(wrapper, /\^dist-phase/);
   assert.match(wrapper, /spawnSync\(process\.execPath, \[/);
   assert.match(wrapper, /'node_modules', 'expo', 'bin', 'cli'/);

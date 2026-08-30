@@ -64,7 +64,11 @@ try {
   requireMatch(path.join(androidRoot, 'app', 'build.gradle'), /versionCode\s+24\b/, 'Generated Gradle versionCode is not 24.', failures);
   requireMatch(path.join(androidRoot, 'app', 'build.gradle'), /versionName\s+["']1\.0\.0["']/, 'Generated Gradle versionName is not 1.0.0.', failures);
   requireMatch(path.join(androidRoot, 'app', 'src', 'main', 'AndroidManifest.xml'), /android\.permission\.CAMERA/, 'Generated manifest is missing CAMERA.', failures);
+  requireMatch(path.join(androidRoot, 'app', 'src', 'main', 'AndroidManifest.xml'), /android\.permission\.RECORD_AUDIO/, 'Generated manifest is missing RECORD_AUDIO.', failures);
+  requireMatch(path.join(androidRoot, 'app', 'src', 'main', 'AndroidManifest.xml'), /android\.permission\.MODIFY_AUDIO_SETTINGS/, 'Generated manifest is missing MODIFY_AUDIO_SETTINGS.', failures);
+  requireMatch(path.join(androidRoot, 'app', 'src', 'main', 'AndroidManifest.xml'), /android\.permission\.BLUETOOTH_CONNECT/, 'Generated manifest is missing BLUETOOTH_CONNECT.', failures);
   requireMatch(path.join(androidRoot, 'app', 'src', 'main', 'AndroidManifest.xml'), /android\.permission\.POST_NOTIFICATIONS/, 'Generated manifest is missing POST_NOTIFICATIONS.', failures);
+  requireMatch(path.join(androidRoot, 'app', 'src', 'main', 'AndroidManifest.xml'), /io\.livekit\.reactnative\.expo\.ANDROID_AUDIO_TYPE[^>]+android:value=["']communication["']/, 'Generated manifest is missing the LiveKit communication-audio configuration.', failures);
   requireMatch(path.join(androidRoot, 'app', 'src', 'main', 'res', 'mipmap-anydpi-v26', 'ic_launcher.xml'), /adaptive-icon/, 'Generated adaptive launcher icon is missing.', failures);
 
   const resourceRoot = path.join(androidRoot, 'app', 'src', 'main', 'res');
@@ -85,7 +89,7 @@ try {
   if (failures.length > 0) process.exitCode = 1;
   else {
     process.stdout.write(`[PASS] Android native prebuild generated ${sourceOnly ? 'source-only' : 'configured'} release inputs.\n`);
-    process.stdout.write('[PASS] applicationId, version, permissions, adaptive icon, notification icon, and Firebase wiring are consistent.\n');
+    process.stdout.write('[PASS] applicationId, version, messaging/call permissions, LiveKit audio, assets, and Firebase wiring are consistent.\n');
   }
 } catch (error) {
   process.stderr.write(`[FAIL] ${error instanceof Error ? error.message : String(error)}\n`);

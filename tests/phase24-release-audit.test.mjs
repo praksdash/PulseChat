@@ -51,6 +51,8 @@ test('Phase 24 native smoke uses a permission-safe Windows junction', () => {
   assert.match(nativeSmoke, /spawnSync\(process\.execPath, \[expoCli,/);
   assert.match(nativeSmoke, /'node_modules', 'expo', 'bin', 'cli'/);
   assert.match(nativeSmoke, /String\(name\)\.split\(path\.sep\)\.join\('\/'\)/);
+  assert.match(nativeSmoke, /android\\\.permission\\\.RECORD_AUDIO/);
+  assert.match(nativeSmoke, /ANDROID_AUDIO_TYPE/);
 });
 
 test('Phase 24 identity validator rejects remote implicit versioning', () => {

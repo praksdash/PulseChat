@@ -61,17 +61,6 @@ test('Phase 27.2 verification checks RLS, privileges, policies and triggers', ()
   assert.match(verification, /anonymous_cannot_read_calls/);
 });
 
-test('Phase 27.2 does not install a calling SDK or expose a token secret', () => {
-  const packageJson = JSON.parse(
-    fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'),
-  );
-  const allDependencies = {
-    ...packageJson.dependencies,
-    ...packageJson.devDependencies,
-  };
-  for (const dependency of Object.keys(allDependencies)) {
-    assert.doesNotMatch(dependency, /livekit|agora|stream-video|webrtc/i);
-  }
+test('Phase 27.2 migration does not expose a provider token secret', () => {
   assert.doesNotMatch(migration, /livekit_api_(key|secret)/);
 });
-

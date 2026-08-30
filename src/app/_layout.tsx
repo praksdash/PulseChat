@@ -7,7 +7,13 @@ import { AppErrorBoundary } from '@/components/system/app-error-boundary';
 import { useAuth } from '@/hooks/use-auth';
 import { AuthProvider } from '@/providers/auth-provider';
 import { ConnectivityProvider } from '@/providers/connectivity-provider';
+import { initializeCallMediaRuntime } from '@/services/call-media-runtime';
 import { ThemeProvider, useAppTheme } from '@/theme';
+
+// Metro resolves a no-op Web adapter and the LiveKit-backed native adapter.
+// Register WebRTC globals before any later call room can be created. Permission
+// prompts remain user-action driven and are never shown during app startup.
+initializeCallMediaRuntime();
 
 function RootNavigator() {
   const theme = useAppTheme();

@@ -19,7 +19,14 @@
       },
       "permissions": [
         "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.BLUETOOTH_CONNECT",
         "android.permission.POST_NOTIFICATIONS"
+      ],
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"
       ],
       "predictiveBackGestureEnabled": false,
       "package": "com.prakashdash.pulsechat",
@@ -57,6 +64,25 @@
           "photosPermission": "Allow PulseChat to access your photos so you can choose images to send in chats or use as your profile picture.",
           "cameraPermission": "Allow PulseChat to use your camera so you can take photos to send in chats.",
           "microphonePermission": false
+        }
+      ],
+      [
+        "@livekit/react-native-expo-plugin",
+        {
+          "android": {
+            "audioType": "communication",
+            "enableScreenShareService": false
+          },
+          "ios": {
+            "enableMultitaskingCameraAccess": false
+          }
+        }
+      ],
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Allow PulseChat to use your camera for video calls.",
+          "microphonePermission": "Allow PulseChat to use your microphone for voice and video calls."
         }
       ]
     ],
