@@ -14,10 +14,13 @@ but Phase 25 still requires the exact AAB, Play forms and controlled-beta proof.
 
 ## Next milestone
 
-Phase 27.1 is the only committed post-V1 micro-phase. It records the scope and
-provider decision for Android one-to-one calling without changing application
-code. Phase 26 remains the stable baseline, and Phase 27.2 must not start until
-the owner approves `docs/PHASE27_1_CALL_SCOPE.md`.
+Phase 27.1 selected the narrow Android one-to-one call scope and LiveKit Cloud
+media provider. Phase 27.2 is the current micro-phase: call-session/participant
+tables, structural validation, RLS, and least-privilege grants only. Phase 26
+remains the stable application baseline.
+
+Phase 27.3 must not start until the Phase 27.2 migration is applied to the owner
+Supabase project and `supabase/phase27_2_verify.sql` passes.
 
 No later Phase 27 micro-phase starts automatically. Complete and review each
 small objective independently, while continuing to track every open Phase
