@@ -11,6 +11,10 @@ export const MESSAGE_NOTIFICATION_CHANNEL = 'messages';
 let activeConversationId: string | null = null;
 let notificationHandlerConfigured = false;
 let pushRegistrationSuspended = false;
+let pushRegistrationInFlight: Promise<PushRegistrationResult> | null = null;
+let lastObservedNativePushToken: string | null = null;
+
+const PUSH_TOKEN_TIMEOUT_MS = 15_000;
 
 function getProjectId() {
   const easProjectId = Constants.easConfig?.projectId;
@@ -81,7 +85,21 @@ export type PushRegistrationResult =
   | { status: 'denied' }
   | { status: 'registered'; token: string };
 
-export async function registerForPushNotifications(): Promise<PushRegistrationResult> {
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+async function performPushRegistration(): Promise<PushRegistrationResult> {
   if (Platform.OS === 'web') return { status: 'unsupported' };
   if (pushRegistrationSuspended) return { status: 'suspended' };
 
@@ -102,7 +120,11 @@ export async function registerForPushNotifications(): Promise<PushRegistrationRe
     throw new Error('Expo EAS projectId is missing from app.json.');
   }
 
-  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  const token = (await withTimeout(
+    Notifications.getExpoPushTokenAsync({ projectId }),
+    PUSH_TOKEN_TIMEOUT_MS,
+    'Push registration timed out. Check the connection and try again.',
+  )).data;
   await registerExpoPushToken({
     token,
     platform: Platform.OS === 'ios' ? 'ios' : 'android',
@@ -113,12 +135,34 @@ export async function registerForPushNotifications(): Promise<PushRegistrationRe
   return { status: 'registered', token };
 }
 
+export async function registerForPushNotifications(): Promise<PushRegistrationResult> {
+  if (pushRegistrationInFlight) return pushRegistrationInFlight;
+
+  const registration = performPushRegistration();
+  pushRegistrationInFlight = registration;
+  try {
+    return await registration;
+  } finally {
+    if (pushRegistrationInFlight === registration) pushRegistrationInFlight = null;
+  }
+}
+
+function nativePushTokenKey(token: Notifications.DevicePushToken) {
+  const data = typeof token.data === 'string' ? token.data : JSON.stringify(token.data);
+  return `${token.type}:${data}`;
+}
+
 export function subscribeToNativePushTokenChanges(onError?: (error: unknown) => void) {
   if (Platform.OS === 'web') return () => undefined;
 
-  const subscription = Notifications.addPushTokenListener(() => {
+  const subscription = Notifications.addPushTokenListener((token) => {
+    const tokenKey = nativePushTokenKey(token);
+    if (lastObservedNativePushToken === tokenKey) return;
+    lastObservedNativePushToken = tokenKey;
+
     // Expo documents that the underlying native token can rotate while the app
-    // is running. Re-fetching the Expo token immediately updates our backend.
+    // is running. Registration is single-flighted and duplicate native-token
+    // events are ignored so a backend error cannot create a retry storm.
     void registerForPushNotifications().catch((error) => {
       onError?.(error);
     });
@@ -159,11 +203,18 @@ export type NativeNotificationStatus = {
   permission: 'granted' | 'denied' | 'undetermined' | 'unsupported';
   registeredDevices: number;
   latestRegistrationAt: string | null;
+  registrationError: string | null;
 };
 
 export async function getNativeNotificationStatus(): Promise<NativeNotificationStatus> {
   if (Platform.OS === 'web') {
-    return { supported: false, permission: 'unsupported', registeredDevices: 0, latestRegistrationAt: null };
+    return {
+      supported: false,
+      permission: 'unsupported',
+      registeredDevices: 0,
+      latestRegistrationAt: null,
+      registrationError: null,
+    };
   }
 
   const permissions = await Notifications.getPermissionsAsync();
@@ -172,8 +223,6 @@ export async function getNativeNotificationStatus(): Promise<NativeNotificationS
     .select('enabled,last_registered_at')
     .eq('enabled', true)
     .order('last_registered_at', { ascending: false });
-
-  if (error) throw new Error(error.message);
 
   const permission = permissions.status === 'granted'
     ? 'granted'
@@ -186,6 +235,7 @@ export async function getNativeNotificationStatus(): Promise<NativeNotificationS
     permission,
     registeredDevices: data?.length ?? 0,
     latestRegistrationAt: data?.[0]?.last_registered_at ?? null,
+    registrationError: error?.message ?? null,
   };
 }
 

@@ -13,6 +13,7 @@ import {
 import { useAuth } from '@/hooks/use-auth';
 import { useConnectivity } from '@/hooks/use-connectivity';
 import { getGroupAvatarPublicUrl } from '@/services/group-service';
+import { getAuthenticatedRequestError } from '@/services/network-error-service';
 import { cacheConversationList, loadCachedConversationList } from '@/services/offline-cache-service';
 import { getAvatarPublicUrl } from '@/services/profile-service';
 import { listMyConversations } from '@/services/conversation-service';
@@ -134,7 +135,10 @@ export default function ChatsScreen() {
         setIsShowingCached(true);
         setError('Offline — showing conversations saved on this device.');
       } else {
-        setError('Unable to load your conversations right now.');
+        setError(getAuthenticatedRequestError(
+          loadError,
+          'Unable to load your conversations right now.',
+        ));
       }
     } finally {
       if (isLatestRequest()) {

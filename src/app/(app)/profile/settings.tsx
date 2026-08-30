@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +13,9 @@ function preferenceLabel(preference: 'system' | 'light' | 'dark') {
 
 export default function SettingsScreen() {
   const theme = useAppTheme();
+  const version = Constants.expoConfig?.version ?? '1.0.0';
+  const versionCode = Constants.expoConfig?.android?.versionCode;
+  const versionLabel = `Prototype V1 · Version ${version}${versionCode ? ` (${versionCode})` : ''}`;
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -56,7 +60,7 @@ export default function SettingsScreen() {
 
         <SurfaceCard style={styles.aboutCard}>
           <AppText variant="captionStrong">PulseChat</AppText>
-          <AppText variant="caption" tone="secondary">Prototype V1 · Phase 23 UX and accessibility polish</AppText>
+          <AppText variant="caption" tone="secondary">{versionLabel}</AppText>
         </SurfaceCard>
       </ScrollView>
     </SafeAreaView>

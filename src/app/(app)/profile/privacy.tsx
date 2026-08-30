@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, View } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, AppIcon, AppText, EmptyState, SettingsRow, SurfaceCard } from '@/components/ui';
+import { getAuthenticatedRequestError } from '@/services/network-error-service';
 import { getMyPrivacySettings, listMyBlockedUsers, updateMyPrivacySettings } from '@/services/privacy-service';
 import { useAppTheme } from '@/theme';
 import type { PrivacySettings } from '@/types/privacy';
@@ -77,7 +78,7 @@ export default function PrivacyScreen() {
       setHasLoaded(true);
     } catch (loadError) {
       setHasLoaded(false);
-      setError(loadError instanceof Error ? loadError.message : 'Unable to load privacy settings.');
+      setError(getAuthenticatedRequestError(loadError, 'Unable to load privacy settings.'));
     } finally {
       setIsLoading(false);
     }
@@ -98,7 +99,7 @@ export default function PrivacyScreen() {
       setSavedSettings(next);
       setSavedMessage('Privacy settings saved.');
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Unable to save privacy settings.');
+      setError(getAuthenticatedRequestError(saveError, 'Unable to save privacy settings.'));
     } finally {
       setIsSaving(false);
     }

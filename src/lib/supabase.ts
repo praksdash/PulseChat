@@ -25,6 +25,21 @@ const configuredKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
 
 export const isSupabaseConfigured = Boolean(configuredUrl && configuredKey);
 
+// Supabase normally reads the current access token from its auth storage before
+// every REST/Storage/Functions request. On some Android release runtimes the
+// encrypted async storage read can briefly return no session even though the
+// auth event has already supplied a valid session to the app. Keep the latest
+// access token in memory and use it only as a native fallback. The value is
+// never persisted here, logged, uploaded as diagnostics, or used for Auth API
+// requests.
+let activeNativeAccessToken: string | null = null;
+
+export function setSupabaseSessionAccessToken(accessToken: string | null | undefined) {
+  activeNativeAccessToken = typeof accessToken === 'string' && accessToken.trim()
+    ? accessToken.trim()
+    : null;
+}
+
 // Expo SecureStore has a small per-value limit on some platforms. Supabase's
 // documented approach stores an AES-256 key in SecureStore and the encrypted
 // session payload in AsyncStorage.
@@ -152,6 +167,38 @@ class BrowserSessionStorage {
 // of crashing before .env is configured.
 const supabaseUrl = configuredUrl || 'https://placeholder.supabase.co';
 const supabasePublishableKey = configuredKey || 'sb_publishable_placeholder';
+const supabaseOrigin = new URL(supabaseUrl).origin;
+
+function attachNativeSessionFallback(
+  urlValue: string,
+  init: RequestInit | undefined,
+): RequestInit | undefined {
+  if (Platform.OS === 'web' || !activeNativeAccessToken) return init;
+
+  let requestUrl: URL;
+  try {
+    requestUrl = new URL(urlValue);
+  } catch {
+    return init;
+  }
+
+  if (requestUrl.origin !== supabaseOrigin || requestUrl.pathname.startsWith('/auth/v1/')) {
+    return init;
+  }
+
+  const headers = new Headers(init?.headers);
+  const existingAuthorization = headers.get('authorization');
+  const publishableKeyAuthorization = `Bearer ${supabasePublishableKey}`;
+
+  // Preserve a real token already supplied by supabase-js. Replace only a
+  // missing header or its anonymous API-key fallback.
+  if (existingAuthorization && existingAuthorization !== publishableKeyAuthorization) {
+    return init;
+  }
+
+  headers.set('authorization', `Bearer ${activeNativeAccessToken}`);
+  return { ...init, headers };
+}
 
 const baseFetch = globalThis.fetch.bind(globalThis);
 const runtimeBuildProfile = Constants.expoConfig?.extra?.release?.buildProfile;
@@ -171,12 +218,13 @@ const instrumentedSupabaseFetch: typeof fetch = async (input, init) => {
   const requestMethod = init?.method
     ?? (typeof input === 'object' && !(input instanceof URL) ? input.method : undefined);
   const operation = classifySupabaseRequest(urlValue, requestMethod);
+  const authenticatedInit = attachNativeSessionFallback(urlValue, init);
 
   // Reporting diagnostics must not report itself and create a feedback loop.
-  if (operation === 'rpc.record_client_diagnostics') return baseFetch(input, init);
+  if (operation === 'rpc.record_client_diagnostics') return baseFetch(input, authenticatedInit);
 
   try {
-    const response = await baseFetch(input, init);
+    const response = await baseFetch(input, authenticatedInit);
     const durationMs = Date.now() - startedAt;
     if (shouldCaptureApiDiagnostic(response.status, durationMs, Math.random())) {
       enqueueDiagnostic({

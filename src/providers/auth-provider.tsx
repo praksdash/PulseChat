@@ -2,8 +2,13 @@ import type { Session, User } from '@supabase/supabase-js';
 import { createContext, type PropsWithChildren, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import {
+  isSupabaseConfigured,
+  setSupabaseSessionAccessToken,
+  supabase,
+} from '@/lib/supabase';
 import { clearChatMediaSignedUrlCache } from '@/services/media-service';
+import { isRetryableNetworkError } from '@/services/network-error-service';
 import { registerForPushNotifications, resumePushRegistration, suspendPushRegistration, unregisterNativePushNotifications } from '@/services/push-notification-service';
 import { disableStoredExpoPushToken } from '@/services/push-token-service';
 import type { Profile } from '@/types/profile';
@@ -41,6 +46,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const signedUrlCacheOwnerRef = useRef<string | null>(null);
   const profileRequestSequenceRef = useRef(0);
   const sessionUserId = session?.user.id;
+
+  const applySession = useCallback((nextSession: Session | null) => {
+    // Update the native request fallback before rendering authenticated
+    // screens, so their first RPC cannot race ahead of secure storage.
+    setSupabaseSessionAccessToken(nextSession?.access_token);
+    setSession(nextSession);
+  }, []);
 
   useEffect(() => {
     const nextOwner = sessionUserId ?? null;
@@ -110,10 +122,29 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     let mounted = true;
 
-    void supabase.auth.getSession().then(({ data, error }: { data: { session: Session | null }; error: Error | null }) => {
+    void supabase.auth.getSession().then(async ({ data, error }: { data: { session: Session | null }; error: Error | null }) => {
       if (!mounted) return;
       if (error) console.warn('Unable to restore auth session:', error.message);
-      setSession(data.session ?? null);
+
+      let restoredSession = data.session ?? null;
+      if (Platform.OS !== 'web' && restoredSession) {
+        const validation = await supabase.auth.getUser(restoredSession.access_token);
+        if (!mounted) return;
+        if (validation.error && !isRetryableNetworkError(validation.error)) {
+          console.warn('Stored Android session is no longer valid. Sign-in is required.');
+          await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+          restoredSession = null;
+        } else if (validation.data.user) {
+          restoredSession = { ...restoredSession, user: validation.data.user };
+        }
+      }
+
+      applySession(restoredSession);
+      setIsInitializing(false);
+    }).catch((restoreError: unknown) => {
+      if (!mounted) return;
+      console.warn('Unable to initialize auth session:', restoreError);
+      applySession(null);
       setIsInitializing(false);
     });
 
@@ -121,7 +152,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event: string, nextSession: Session | null) => {
       if (!mounted) return;
-      setSession(nextSession);
+      applySession(nextSession);
       setIsInitializing(false);
     });
 
@@ -129,7 +160,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [applySession]);
 
   useEffect(() => {
     if (!sessionUserId || !isSupabaseConfigured) {
@@ -145,13 +176,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const signIn = useCallback(async (email: string, password: string) => {
     if (!isSupabaseConfigured) return missingConfigurationMessage;
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
     });
 
+    if (data.session) applySession(data.session);
     return error ? getFriendlyAuthError(error) : null;
-  }, []);
+  }, [applySession]);
 
   const signUp = useCallback(async (displayName: string, email: string, password: string) => {
     if (!isSupabaseConfigured) {
@@ -172,11 +204,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return { error: getFriendlyAuthError(error), requiresEmailConfirmation: false };
     }
 
+    if (data.session) applySession(data.session);
+
     return {
       error: null,
       requiresEmailConfirmation: Boolean(data.user && !data.session),
     };
-  }, []);
+  }, [applySession]);
 
   const signOut = useCallback(async () => {
     if (!isSupabaseConfigured) return missingConfigurationMessage;
@@ -205,10 +239,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return getFriendlyAuthError(error);
     }
 
-    setSession(null);
+    applySession(null);
     setProfile(null);
     return null;
-  }, []);
+  }, [applySession]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

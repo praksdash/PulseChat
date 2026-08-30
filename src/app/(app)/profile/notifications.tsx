@@ -30,6 +30,7 @@ const EMPTY_NATIVE_STATUS: NativeNotificationStatus = {
   permission: 'unsupported',
   registeredDevices: 0,
   latestRegistrationAt: null,
+  registrationError: null,
 };
 
 function formatDate(value: string | null) {
@@ -58,7 +59,11 @@ export default function NotificationSettingsScreen() {
 
     if (Platform.OS === 'web') return;
     try {
-      setNativeStatus(await getNativeNotificationStatus());
+      const nextStatus = await getNativeNotificationStatus();
+      setNativeStatus(nextStatus);
+      if (nextStatus.registrationError) {
+        setError(`Unable to verify push registration: ${nextStatus.registrationError}`);
+      }
     } catch (statusError) {
       setError(statusError instanceof Error ? statusError.message : 'Unable to read notification status.');
     }

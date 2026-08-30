@@ -21,6 +21,7 @@ import {
 } from '@/components/ui';
 import { useAuth } from '@/hooks/use-auth';
 import { getGroupAvatarPublicUrl } from '@/services/group-service';
+import { isSessionAuthorizationError } from '@/services/network-error-service';
 import { getAvatarPublicUrl } from '@/services/profile-service';
 import {
   GLOBAL_SEARCH_MIN_LENGTH,
@@ -127,13 +128,18 @@ export default function SearchScreen() {
       if (requestId !== requestSequence.current) return;
 
       const failures = [peopleResult, chatResult, messageResult].filter((result) => result.status === 'rejected').length;
+      const sessionFailure = [peopleResult, chatResult, messageResult].some(
+        (result) => result.status === 'rejected' && isSessionAuthorizationError(result.reason),
+      );
       setPeople(peopleResult.status === 'fulfilled' ? peopleResult.value : []);
       setChats(chatResult.status === 'fulfilled' ? chatResult.value : []);
       const nextMessages = messageResult.status === 'fulfilled' ? messageResult.value : [];
       setMessages(nextMessages);
       setHasMoreMessages(nextMessages.length >= MESSAGE_SEARCH_PAGE_SIZE);
 
-      if (failures === 3) {
+      if (sessionFailure) {
+        setError('Your secure session could not be verified. Please sign out and sign in again.');
+      } else if (failures === 3) {
         setError('Search is unavailable right now. Check your connection and try again.');
       } else if (failures > 0) {
         setError('Some search results could not be loaded. You can retry.');

@@ -20,3 +20,20 @@ export function isRetryableNetworkError(error: unknown) {
     'fetch failed',
   ].some((needle) => message.includes(needle));
 }
+
+export function isSessionAuthorizationError(error: unknown) {
+  const message = getErrorText(error).toLowerCase();
+  return message.includes('permission denied for function')
+    || message.includes('jwt expired')
+    || message.includes('invalid jwt')
+    || message.includes('jwt issued at future');
+}
+
+export function getAuthenticatedRequestError(error: unknown, fallback: string) {
+  if (isSessionAuthorizationError(error)) {
+    return 'Your secure session could not be verified. Please sign out and sign in again.';
+  }
+  return isRetryableNetworkError(error)
+    ? 'Check your connection and try again.'
+    : fallback;
+}
